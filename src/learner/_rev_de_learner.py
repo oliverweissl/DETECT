@@ -1,17 +1,13 @@
 import numpy as np
 from numpy.typing import NDArray
+from ._learner import Learner
 
 
-class RevDELearner:
+class RevDELearner(Learner):
     """
     A Reverse Differential Evolutionary Learner.
     For theory see: https://arxiv.org/pdf/2002.02869.
     """
-    # General states
-    _generation: int
-    _best_candidate: tuple[NDArray, float]
-    _mean_first: float
-
     # Parameters
     _population_size: int
     _bounds: tuple[int, int]
@@ -19,7 +15,6 @@ class RevDELearner:
     CR: float
 
     # Population stuff
-    _x_current: NDArray
     _x_previous: NDArray
     _fitness_current: NDArray
 
@@ -52,9 +47,12 @@ class RevDELearner:
         self._x_previous = np.empty(shape=x0.shape, dtype=x0.dtype)
         self._fitness = np.empty(shape=x0.shape, dtype=float)
 
-    def new_population(self, fitnesses: NDArray) -> NDArray:
-        self._mean_first = np.mean(fitnesses) if self._generation == 0 else self._mean_first
+    def new_population(self, fitnesses: NDArray) -> None:
+        """
+        Generate a new population based on fitnesses of current population.
 
+        :param fitnesses: The evaluated fitnesses.
+        """
         x, f = self._select(self._x_current, fitnesses)
         x_cand, f_min = x[np.argmin(f)], np.min(f)
         self._best_candidate = (x_cand, f_min) if f_min < self._best_candidate[1] else self._best_candidate
@@ -62,26 +60,6 @@ class RevDELearner:
         self._x_current = self._recombination(x)
         self._x_previous = x
         self._fitness = f
-        self._generation += 1
-
-    @property
-    def best_candidate(self) -> tuple[NDArray, float]:
-        """
-        Get the best candidate in the RevDE.
-
-        :return: The candidate.
-        """
-        return self._best_candidate
-
-    @property
-    def x_current(self) -> NDArray:
-        """
-        Get the current population of genomes.
-
-        :return: The population.
-        """
-        return self._x_current
-
 
     def _recombination(self, x: NDArray) -> NDArray:
         """
