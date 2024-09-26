@@ -16,6 +16,7 @@ class RevDELearner(Learner):
 
     # Population stuff
     _x_previous: NDArray
+    _x_current_continuous: NDArray
     _fitness_current: NDArray
 
     def __init__(
@@ -44,7 +45,7 @@ class RevDELearner(Learner):
         self.CR = cr # The crossover rate.
 
         self._x_current = x0
-        self._x_previous = np.empty(shape=x0.shape, dtype=x0.dtype)
+        self._x_current_continuous = np.random.rand(*x0.shape)
         self._fitness = np.empty(shape=x0.shape, dtype=float)
 
     def new_population(self, fitnesses: NDArray) -> None:
@@ -53,12 +54,13 @@ class RevDELearner(Learner):
 
         :param fitnesses: The evaluated fitnesses.
         """
-        x, f = self._select(self._x_current, fitnesses)
+        x, f = self._select(self._x_current_continuous, fitnesses)
         x_cand, f_min = x[np.argmin(f)], np.min(f)
         self._best_candidate = (x_cand, f_min) if f_min < self._best_candidate[1] else self._best_candidate
 
-        self._x_current = self._recombination(x)
-        self._x_previous = x
+        self._x_current_continuous = self._recombination(x)
+        """RevDE works better on continuous spaces, as such we map the continous genome to the binary genome."""
+        self._x_current = np.round(self._x_current_continuous, 0)
         self._fitness = f
 
     def _recombination(self, x: NDArray) -> NDArray:
@@ -86,9 +88,9 @@ class RevDELearner(Learner):
             p_1 = np.random.binomial(1, self.CR, y_1.shape)
             p_2 = np.random.binomial(1, self.CR, y_2.shape)
             p_3 = np.random.binomial(1, self.CR, y_3.shape)
-            y_1 = np.round(p_1 * y_1 + (1. - p_1) * x_1, decimals=0)
-            y_2 = np.round(p_2 * y_2 + (1. - p_2) * x_2, decimals=0)
-            y_3 = np.round(p_3 * y_3 + (1. - p_3) * x_3, decimals=0)
+            y_1 = p_1 * y_1 + (1. - p_1) * x_1
+            y_2 = p_2 * y_2 + (1. - p_2) * x_2
+            y_3 = p_3 * y_3 + (1. - p_3) * x_3
 
         x[[indices_1, indices_2, indices_3]] = y_1, y_2, y_3
         return x
