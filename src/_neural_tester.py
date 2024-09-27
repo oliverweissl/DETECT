@@ -51,43 +51,47 @@ class NeuralTester:
 
         self._predictor.eval()
 
-    def test(self, input: Dataset):
+    def test(self, input_dataset: Dataset):
         """
         Testing the predictor for its desicion boundary using a set of Inputs.
 
-        :param input: The dataset to test.
+        :param input_dataset: The dataset to test.
         """
-        for X, y in input:
+        for X, y in input_dataset:
             y_hat = self._predictor(X)
             first, second, *_ = torch.argsort(y_hat)
 
             if torch.argmax(y) != first:  # We are only interested in checking the boundary if the prediction matches the label
                 continue
 
-            seed, seed_p = self._get_seeds(y, second)
-            pop_size = len(self._learner.x_current)
+            seed, seed_p = self._get_seed(y), self._get_seed(second)
             for _ in range(self._generations):
-                predictions = self._predictor()
+                mixed_images = self._mix_seeds(seed, seed_p, self._learner.x_current)
+                predictions = self._predictor(mixed_images)
+
+                fitnesses = np.array([self._learner_evaluation_function(X, Xp, y, yp) for Xp, yp in zip(mixed_images, predictions)])
+                self._learner.new_population(fitnesses)
 
 
-                fitnesses = self._predictor_evaluation_function(np.full(pop_size, fill_value=X), )
+    def _get_seed(self, y: NDArray) -> Any:
+        """
+        Get a seed from a specific label.
 
-                self._learner.new_population()
-
-
-    def _get_seeds(self,y, y_p) -> tuple[Any, Any]:
+        :param y: The class lable.
+        :returns: The seed element.
+        """
         pass
 
     def _mix_seeds(self, seed, seed_p, genomes:NDArray) -> Tensor:
         """
         Mix seeds to get new input images based on genomes.
 
-        :param seed:
-        :param seed_p:
+        :param seed: The initial seed.
+        :param seed_p: The second seed.
         :param genomes: The genomes for mixing.
-        :return: The new images.
+        :return: The generated images.
         """
-        seed[]
+        pass
 
 
 
