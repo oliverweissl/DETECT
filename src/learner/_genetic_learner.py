@@ -1,6 +1,4 @@
 from typing import Callable
-from unittest.mock import inplace
-
 from numpy.typing import NDArray
 import numpy as np
 from ._learner import Learner

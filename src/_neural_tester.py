@@ -53,7 +53,7 @@ class NeuralTester:
 
     def test(self, input_dataset: Dataset):
         """
-        Testing the predictor for its desicion boundary using a set of Inputs.
+        Testing the predictor for its decision boundary using a set of Inputs.
 
         :param input_dataset: The dataset to test.
         """
@@ -93,6 +93,16 @@ class NeuralTester:
         """
         pass
 
+    # TODO -> Class as vector
+    # All classes concatenate
+    # seeds are a list ?? tf is this
+    # w0 seeds are matrices -> num(seeds) x label vec
+
+
+    # All zs -> latent noise x number of seeds
+
+    # -> then map zs to classes using mapping network
+    # for final W`s -> wetake all weights of seeds and apply their weights --> is this new dimension to our genome??
 
 
 
