@@ -3,32 +3,47 @@ import numpy as np
 from torch import Tensor
 from torch_utils.ops import upfirdn2d
 import dnnlib
+from ._mix_candidate import CandidateList
+
 
 class StyleMixer:
-    """A class geared towards style-mixing."""
+    """
+    A class geared towards style-mixing.
+
+    This class is heavily influenced by the Renderer class in the StyleGAN3 repo.
+    """
     _generator: torch.nn.Module
     _device: torch.device
     _has_input_transform: bool
 
-    _pinned_bufs: dict
+    _pinned_bufs: dict  # Custom buffer for GPU? NVIDIA stuff I guess.
+    _mix_dims: Tensor  # Range for dimensions to mix styles with.
 
     def __init__(
             self,
             generator: torch.nn.Module,
             device: torch.device,
+            mix_dims: tuple[int, int]
     ):
+        """
+        Initialize the StyleMixer object.
+
+        :param generator: The generator network to use.
+        :param device: The torch device to use (should be cuda).
+        :param mix_dims: The w-dimensions to use for mixing.
+        """
         self._generator=generator
         self._device=device
         self._has_input_transform = (hasattr(generator.synthesis, 'input') and hasattr(generator.synthesis.input, 'transform'))
+        self._pinned_bufs = {}
+        self._mix_dims = torch.arange(*mix_dims, device=self._device)  # Dimensions of w -> we only want to mix style layers.
 
     def mix(
             self,
-            seeds: list[int],
-            weights: list[float],
-            classes: list[int],
-            stylemix_indices: list[int],
-            stylemix_weights: list[float],
-            rseed: int = 0,
+            candidates: CandidateList,
+            smx_indices: list[int],
+            smx_weights: list[float],
+            random_seed: int = 0,
             sel_channels: int = 3,
     ) -> Tensor:
         """
@@ -36,16 +51,14 @@ class StyleMixer:
 
         This function is heavily inspired by the Renderer class of the original StyleGANv3 codebase.
 
-        :param seeds: The seeds to use for generation.
-        :param weights: The weights of seeds.
-        :param classes: The classes of seeds.
-        :param stylemix_indices: The style mix strategy (For styleGAN3 L0-L13).
-        :param stylemix_weights: The weights for mixing.
-        :param rseed: The seed for randomization.
+        :param candidates: The candidates used for style-mixing.
+        :param smx_indices: The style mix strategy.
+        :param smx_weights: The weights for mixing.
+        :param random_seed: The seed for randomization.
         :param sel_channels: Channels to be selected for output.
         :returns: The generated data.
         """
-        assert len(seeds) == len(weights) == len(classes) == len(stylemix_indices) == len(stylemix_weights), "Error: The parameters have to be of same length."
+        assert len(smx_indices) == len(smx_weights), "Error: The parameters have to be of same length."
 
         if self._has_input_transform:
             m = np.eye(3)
@@ -53,9 +66,11 @@ class StyleMixer:
             self._generator.synthesis.input.transform.copy_(torch.from_numpy(m))
 
         """Generate latents."""
-        all_zs = np.zeros([len(seeds), self._generator.z_dim], dtype=np.float32)  # Latent inputs
-        all_cs = np.zeros([len(seeds), self._generator.c_dim], dtype=np.float32)  # Input classes
-        all_cs[:, classes] = 1  # Set classes in class vector
+        num_candidates = len(candidates)
+
+        all_zs = np.zeros([num_candidates, self._generator.z_dim], dtype=np.float32)  # Latent inputs
+        all_cs = np.zeros([num_candidates, self._generator.c_dim], dtype=np.float32)  # Input classes
+        all_cs[list(range(num_candidates)), candidates.get_labels()] = 1  # Set classes in class vector
 
         all_zs = self._to_device(torch.from_numpy(all_zs))
         all_cs = self._to_device(torch.from_numpy(all_cs))
@@ -63,22 +78,23 @@ class StyleMixer:
         ws_average = self._generator.mapping.w_avg
         all_ws = self._generator.mapping(z=all_zs, c=all_cs, truncation_psi=1, truncation_cutoff=0) - ws_average
 
-        weight_tensor = torch.Tensor(weights)[:, None, None]
-        w = all_ws[0]*weight_tensor[0]  # 16 x m; Only 1 w0 seed for now
+        w0_candidates = candidates.get_w0_candidates()
+        w0_weights, w0_w_indices = w0_candidates.get_weights(), w0_candidates.get_w_indices()
+        weight_tensor = torch.as_tensor(w0_weights, device=self._device)[:, None, None]
+        w = (w0_w_indices*weight_tensor)  # Initialize base using w0 seeds.
 
         """
         Here we do style mixing.
-        
+
         Since we want to mix our baseclass with a second class we take the layers to mix, and apply the second class with its weights.
         Note if the index to mix is baseclass, this has no effect.
         """
-        w_dim = torch.arange(1,15, device=self._device)  # Dimensions of w -> we only want to mix style layers.
-        smw_tensor = torch.Tensor(stylemix_weights)[:, None]  # 14 x 1
-        w[w_dim] += all_ws[stylemix_indices, w_dim] * smw_tensor + all_ws[0, w_dim] * ((smw_tensor-1)*-1)
+        smw_tensor = torch.as_tensor(smx_weights, device=self._device)[:, None]  # 14 x 1
+        w[self._mix_dims] += all_ws[smx_indices, self._mix_dims] * smw_tensor + all_ws[0, self._mix_dims] * ((smw_tensor-1)*-1)
         w = w / 2 + ws_average
 
-        torch.manual_seed(rseed)
-        out, _ = self._run_synthesis_net(self._generator.synthesis, w[None, :, :], noise_mode="const", force_fp32=False)
+        torch.manual_seed(random_seed)
+        out, _ = self._run_synthesis_net(self._generator.synthesis, w[None,:,:], noise_mode="const", force_fp32=False)
 
         out = out[0].to(torch.float32)
         if sel_channels > out.shape[0]:
@@ -88,10 +104,9 @@ class StyleMixer:
 
         img = sel / sel.norm(float('inf'), dim=[1, 2], keepdim=True).clip(1e-8, 1e8)
         img = (img * 127.5 + 128).clamp(0, 255).to(torch.uint8).permute(1, 2, 0)
-
         return img
 
-    # ------------------ Borrowed from https://github.com/NVlabs/stylegan3/blob/main/viz/renderer.py -----------------------
+    # ------------------ Copied from https://github.com/NVlabs/stylegan3/blob/main/viz/renderer.py -----------------------
     def _get_pinned_buf(self, ref):
         key = (tuple(ref.shape), ref.dtype)
         buf = self._pinned_bufs.get(key, None)
@@ -203,12 +218,10 @@ def _construct_affine_bandlimit_filter(mat, a=3, amax=16, aflt=64, up=4, cutoff_
     f = f.reshape(amax * 2 * up, amax * 2 * up)[:-1, :-1]
     return f
 
-
 def _sinc(x):
     y = (x * np.pi).abs()
     z = torch.sin(y) / y.clamp(1e-30, float('inf'))
     return torch.where(y < 1e-30, torch.ones_like(x), z)
-
 
 def _lanczos_window(x, a):
     x = x.abs() / a
