@@ -41,7 +41,7 @@ class StyleMixer:
     def mix(
             self,
             candidates: CandidateList,
-            smx_indices: list[int],
+            smx_cond: list[int],
             smx_weights: list[float],
             random_seed: int = 0,
             noise_mode: str = "random",
@@ -52,13 +52,13 @@ class StyleMixer:
         This function is heavily inspired by the Renderer class of the original StyleGANv3 codebase.
 
         :param candidates: The candidates used for style-mixing.
-        :param smx_indices: The style mix strategy.
+        :param smx_cond: The style mix strategy.
         :param smx_weights: The weights for mixing.
         :param random_seed: The seed for randomization.
         :param noise_mode: The noise to use for style generation (const, random).
         :returns: The generated image (C x H x W).
         """
-        assert len(smx_indices) == len(smx_weights), "Error: The parameters have to be of same length."
+        assert len(smx_cond) == len(smx_weights), "Error: The parameters have to be of same length."
 
         if self._has_input_transform:
             m = np.eye(3)
@@ -70,7 +70,7 @@ class StyleMixer:
 
         all_zs = np.zeros([num_candidates, self._generator.z_dim], dtype=np.float32)  # Latent inputs
         all_cs = np.zeros([num_candidates, self._generator.c_dim], dtype=np.float32)  # Input classes
-        all_cs[list(range(num_candidates)), candidates.get_labels()] = 1  # Set classes in class vector
+        all_cs[list(range(num_candidates)), candidates.labels] = 1  # Set classes in class vector
 
         all_zs = self._to_device(torch.from_numpy(all_zs))
         all_cs = self._to_device(torch.from_numpy(all_cs))
@@ -78,20 +78,23 @@ class StyleMixer:
         ws_average = self._generator.mapping.w_avg
         all_ws = self._generator.mapping(z=all_zs, c=all_cs, truncation_psi=1, truncation_cutoff=0) - ws_average
 
-        w0_candidates = candidates.get_w0_candidates()
-        w0_weights, w0_w_indices = w0_candidates.get_weights(), w0_candidates.get_w_indices()
+        w0_candidates = candidates.w0_candidates
+        w0_weights, w0_w_indices = w0_candidates.weights, w0_candidates.w_indices
         assert sum(w0_weights) == 1, f"Error: w0 weight do not sum up to one: {w0_weights}."
         weight_tensor = torch.as_tensor(w0_weights, device=self._device)[:, None, None]
-        w = (all_ws[w0_w_indices] * weight_tensor).sum(dim=0, keepdim=True)  # Initialize base using w0 seeds.
-
+        w0 = (all_ws[w0_w_indices] * weight_tensor).sum(dim=0, keepdim=True)  # Initialize base using w0 seeds.
+        w = w0.clone().detach()
         """
         Here we do style mixing.
 
         Since we want to mix our baseclass with a second class we take the layers to mix, and apply the second class with its weights.
         Note if the index to mix is baseclass, this has no effect.
         """
+        # Since smx indices do not contain w0 the index of wn in all_ws is different to index of wn in smx_indices.
+        # Here we convert the indices to condition such that we know which w to take for each layer (If only one candidate this is array of zeros).
+        wn_w_cond = [candidates.wn_candidates.w_indices[cond] for cond in smx_cond]
         smw_tensor = torch.as_tensor(smx_weights, device=self._device)[:, None]  # 14 x 1
-        w[self._mix_dims] += all_ws[smx_indices, self._mix_dims] * smw_tensor + all_ws[w0_w_indices, self._mix_dims] * ((smw_tensor-1)*-1)
+        w[self._mix_dims] += all_ws[wn_w_cond, self._mix_dims] * smw_tensor + w0[self._mix_dims] * -(smw_tensor-1)
         w = w / 2 + ws_average
 
         torch.manual_seed(random_seed)

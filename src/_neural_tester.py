@@ -73,15 +73,15 @@ class NeuralTester:
             candidates = CandidateList(c1, c2)
 
             for _ in range(self._generations):
-                smx_indices_arr, smx_weights_arr = self._learner.get_x_current
+                smx_cond_arr, smx_weights_arr = self._learner.get_x_current
 
                 images = []
-                for smx_indices, smx_weights in zip(smx_indices_arr, smx_weights_arr):
+                for smx_cond, smx_weights in zip(smx_cond_arr, smx_weights_arr):
                     mixed_image = self._mixer.mix(
                         candidates=candidates,
-                        smx_indices=smx_indices,
+                        smx_cond=smx_cond,
                         smx_weights=smx_weights,
-                        random_seed=self._get_random_seed(),
+                        random_seed=self._get_time_seed(),
                     )
                     images.append(mixed_image)
 
@@ -90,7 +90,6 @@ class NeuralTester:
                 self._learner.new_population(fitness)
 
     @staticmethod
-    def _get_random_seed() -> int:
+    def _get_time_seed() -> int:
         now = datetime.now()
-        rand = np.random.randint(int(round(now.timestamp())))
-        return rand
+        return int(round(now.timestamp()))

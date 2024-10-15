@@ -68,11 +68,11 @@ class RevDELearner(Learner):
         """
         Return the current population in specific format.
 
-        :return: The population as array of smx indices and smx weights.
+        :return: The population as array of smx conditions and smx weights.
         """
-        smx_indices = self._x_current.round(0)
-        smx_weights = self._x_current if self._continuous else np.ones_like(smx_indices)
-        return smx_indices, smx_weights
+        smx_cond = np.zeros_like(self._x_current)  # TODO: for now only one element can be used to mix styles -> should be n elements.
+        smx_weights = self._x_current if self._continuous else self._x_current.round(0)
+        return smx_cond, smx_weights
 
     def _recombination(self, x: NDArray) -> NDArray:
         """
