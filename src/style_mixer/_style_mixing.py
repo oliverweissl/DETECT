@@ -78,31 +78,31 @@ class StyleMixer:
         ws_average = self._generator.mapping.w_avg
         all_ws = self._generator.mapping(z=all_zs, c=all_cs, truncation_psi=1, truncation_cutoff=0) - ws_average
 
-        w0_candidates = candidates.w0_candidates
-        w0_weights, w0_w_indices = w0_candidates.weights, w0_candidates.w_indices
+        """Get candidates for w0 calculation."""
+        w0_weights, w0_w_indices = candidates.w0_candidates.weights, candidates.w0_candidates.w_indices
         assert sum(w0_weights) == 1, f"Error: w0 weight do not sum up to one: {w0_weights}."
         weight_tensor = torch.as_tensor(w0_weights, device=self._device)[:, None, None]
         w0 = (all_ws[w0_w_indices] * weight_tensor).sum(dim=0, keepdim=True)  # Initialize base using w0 seeds.
-        w = w0.clone().detach()
+        w = w0.clone().detach()  # Clone w0 for calculation of w -> we want them seperate.
         """
         Here we do style mixing.
 
-        Since we want to mix our baseclass with a second class we take the layers to mix, and apply the second class with its weights.
-        Note if the index to mix is baseclass, this has no effect.
+        Since we want to mix w0 with wn we take the ws in wn to mix and apply their weights..
         """
         # Since smx indices do not contain w0 the index of wn in all_ws is different to index of wn in smx_indices.
-        # Here we convert the indices to condition such that we know which w to take for each layer (If only one candidate this is array of zeros).
+        # Here we convert the indices to condition such that we know which w to take for each layer (If only one candidate this is array of equal integers).
         wn_w_cond = [candidates.wn_candidates.w_indices[cond] for cond in smx_cond]
-        smw_tensor = torch.as_tensor(smx_weights, device=self._device)[:, None]  # 14 x 1
+        smw_tensor = torch.as_tensor(smx_weights, device=self._device)[:, None]  # |_mix_dims| x 1
         w[self._mix_dims] += all_ws[wn_w_cond, self._mix_dims] * smw_tensor + w0[self._mix_dims] * -(smw_tensor-1)
         w = w / 2 + ws_average
 
         torch.manual_seed(random_seed)
         out, _ = self._run_synthesis_net(self._generator.synthesis, w[None,:,:], noise_mode=noise_mode, force_fp32=False)
 
-        sel = out[0].to(torch.float32)
-        img = sel / sel.norm(float('inf'), dim=[1, 2], keepdim=True).clip(1e-8, 1e8)
-        img = (img * 127.5 + 128).clamp(0, 255).to(torch.uint8)
+        """Convert the output to an image format."""
+        sel = out[0].to(torch.float32)  # 1 x C x W x H -> C x W x H
+        img = sel / sel.norm(float('inf'), dim=[1, 2], keepdim=True).clip(1e-8, 1e8)  # Normalize color range.
+        img = (img * 127.5 + 128).clamp(0, 255).to(torch.uint8)  # Standardize to fit RGB range.
         return img
 
     # ------------------ Copied from https://github.com/NVlabs/stylegan3/blob/main/viz/renderer.py -----------------------
