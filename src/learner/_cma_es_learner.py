@@ -41,3 +41,11 @@ class CMAESLearner(Learner):
 
         self._x_current_continuous = new_candidates
         self._x_current = np.round(new_candidates, 0)
+
+    def get_x_current(self) -> tuple[NDArray, NDArray]:
+        """
+        Return the current population in specific format.
+
+        :return: The population as array of smx indices and smx weights.
+        """
+        raise NotImplemented

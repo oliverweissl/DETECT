@@ -30,7 +30,7 @@ class StyleMixer:
 
         :param generator: The generator network to use.
         :param device: The torch device to use (should be cuda).
-        :param mix_dims: The w-dimensions to use for mixing.
+        :param mix_dims: The w-dimensions to use for mixing (range index).
         """
         self._generator=generator
         self._device=device
@@ -44,7 +44,7 @@ class StyleMixer:
             smx_indices: list[int],
             smx_weights: list[float],
             random_seed: int = 0,
-            sel_channels: int = 3,
+            noise_mode: str = "random",
     ) -> Tensor:
         """
         Generate data using style mixing.
@@ -55,8 +55,8 @@ class StyleMixer:
         :param smx_indices: The style mix strategy.
         :param smx_weights: The weights for mixing.
         :param random_seed: The seed for randomization.
-        :param sel_channels: Channels to be selected for output.
-        :returns: The generated data.
+        :param noise_mode: The noise to use for style generation (const, random).
+        :returns: The generated image (C x H x W).
         """
         assert len(smx_indices) == len(smx_weights), "Error: The parameters have to be of same length."
 
@@ -80,8 +80,9 @@ class StyleMixer:
 
         w0_candidates = candidates.get_w0_candidates()
         w0_weights, w0_w_indices = w0_candidates.get_weights(), w0_candidates.get_w_indices()
+        assert sum(w0_weights) == 1, f"Error: w0 weight do not sum up to one: {w0_weights}."
         weight_tensor = torch.as_tensor(w0_weights, device=self._device)[:, None, None]
-        w = (w0_w_indices*weight_tensor)  # Initialize base using w0 seeds.
+        w = (all_ws[w0_w_indices] * weight_tensor).sum(dim=0, keepdim=True)  # Initialize base using w0 seeds.
 
         """
         Here we do style mixing.
@@ -90,20 +91,15 @@ class StyleMixer:
         Note if the index to mix is baseclass, this has no effect.
         """
         smw_tensor = torch.as_tensor(smx_weights, device=self._device)[:, None]  # 14 x 1
-        w[self._mix_dims] += all_ws[smx_indices, self._mix_dims] * smw_tensor + all_ws[0, self._mix_dims] * ((smw_tensor-1)*-1)
+        w[self._mix_dims] += all_ws[smx_indices, self._mix_dims] * smw_tensor + all_ws[w0_w_indices, self._mix_dims] * ((smw_tensor-1)*-1)
         w = w / 2 + ws_average
 
         torch.manual_seed(random_seed)
-        out, _ = self._run_synthesis_net(self._generator.synthesis, w[None,:,:], noise_mode="const", force_fp32=False)
+        out, _ = self._run_synthesis_net(self._generator.synthesis, w[None,:,:], noise_mode=noise_mode, force_fp32=False)
 
-        out = out[0].to(torch.float32)
-        if sel_channels > out.shape[0]:
-            sel_channels = 1
-        base_channel = max(out.shape[0] - sel_channels, 0)
-        sel = out[base_channel: base_channel + sel_channels]
-
+        sel = out[0].to(torch.float32)
         img = sel / sel.norm(float('inf'), dim=[1, 2], keepdim=True).clip(1e-8, 1e8)
-        img = (img * 127.5 + 128).clamp(0, 255).to(torch.uint8).permute(1, 2, 0)
+        img = (img * 127.5 + 128).clamp(0, 255).to(torch.uint8)
         return img
 
     # ------------------ Copied from https://github.com/NVlabs/stylegan3/blob/main/viz/renderer.py -----------------------

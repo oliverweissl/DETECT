@@ -7,8 +7,8 @@ class MixCandidate:
     """A simple container for candidate elements used in style mixing."""
 
     label: int  # The class label of the candidate.
-    is_w0: bool  # Whether candidate is used for w0 calculation.
-    weight: float = 1.  # The weight of the candidate for final w calculation.
+    is_w0: bool = False # Whether candidate is used for w0 calculation.
+    weight: float = 1.  # The weight of the candidate for w0 calculation.
     w_index: int | None = None # Index in the w calculation.
 
 
@@ -24,6 +24,9 @@ class CandidateList(UserList):
             elif candidate.w_index <= max_i:
                 raise KeyError(f"Something corrupted the order of this Candidate List: {self.get_w_indices()}")
             max_i = candidate.w_index
+
+        if not any((elem.is_w0 for elem in self.data)):  # If none of candidates are w0 we take first candidate as w0.
+            self.data[0].is_w0 = True
 
     def get_weights(self) -> list[float]:
         return [elem.weight for elem in self.data]

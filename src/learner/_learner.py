@@ -17,6 +17,15 @@ class Learner(ABC):
         """
         ...
 
+    @abstractmethod
+    def get_x_current(self) -> tuple[NDArray, NDArray]:
+        """
+        Return the current population in specific format.
+
+        :return: The population as array of smx indices and smx weights.
+        """
+        ...
+
     @property
     def best_candidate(self) -> tuple[NDArray, float]:
         """
@@ -25,13 +34,3 @@ class Learner(ABC):
         :return: The candidate.
         """
         return self._best_candidate
-
-    @property
-    def x_current(self) -> NDArray:
-        """
-        Get the current population of genomes.
-
-        :return: The population.
-        """
-        return self._x_current
-

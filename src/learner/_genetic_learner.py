@@ -80,3 +80,11 @@ class GeneticLearner(Learner):
         """
         assert (l:=len(xa)) == len(xb)
         return np.concatenate(xa[:l], xb[l:])
+
+    def get_x_current(self) -> tuple[NDArray, NDArray]:
+        """
+        Return the current population in specific format.
+
+        :return: The population as array of smx indices and smx weights.
+        """
+        raise NotImplemented

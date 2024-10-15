@@ -13,6 +13,7 @@ class RevDELearner(Learner):
     _bounds: tuple[int, int]
     F: float
     CR: float
+    _continuous: bool
 
     # Population stuff
     _x_previous: NDArray
@@ -26,6 +27,7 @@ class RevDELearner(Learner):
             bounds:tuple[int, int] = (0,1),
             f: float = 0.9,
             cr: float = 0.5,
+            continuous: bool = False,
     ) -> None:
         """
         Initialize the Reverse Differential Evolutionary Learner.
@@ -35,6 +37,7 @@ class RevDELearner(Learner):
         :param bounds: The bounds of the population.
         :param f: The scaling factor.
         :param cr: The crossover rate.
+        :param continuous: If genomes are continuous or not.
         """
         self._generation = 0
         self._best_fitness = np.inf
@@ -43,9 +46,9 @@ class RevDELearner(Learner):
         self._bounds = bounds  # The bounds of genome values.
         self.F = f  # The scaling factor.
         self.CR = cr # The crossover rate.
+        self._continuous = continuous
 
-        self._x_current = x0
-        self._x_current_continuous = np.random.rand(*x0.shape)
+        self._x_current= x0
         self._fitness = np.empty(shape=x0.shape, dtype=float)
 
     def new_population(self, fitnesses: NDArray) -> None:
@@ -54,14 +57,22 @@ class RevDELearner(Learner):
 
         :param fitnesses: The evaluated fitnesses.
         """
-        x, f = self._select(self._x_current_continuous, fitnesses)
+        x, f = self._select(self._x_current, fitnesses)
         x_cand, f_min = x[np.argmin(f)], np.min(f)
         self._best_candidate = (x_cand, f_min) if f_min < self._best_candidate[1] else self._best_candidate
 
-        self._x_current_continuous = self._recombination(x)
-        """RevDE works better on continuous spaces, as such we map the continous genome to the binary genome."""
-        self._x_current = np.round(self._x_current_continuous, 0)
+        self._x_current = self._recombination(x)
         self._fitness = f
+
+    def get_x_current(self) -> tuple[NDArray, NDArray]:
+        """
+        Return the current population in specific format.
+
+        :return: The population as array of smx indices and smx weights.
+        """
+        smx_indices = self._x_current.round(0)
+        smx_weights = self._x_current if self._continuous else np.ones_like(smx_indices)
+        return smx_indices, smx_weights
 
     def _recombination(self, x: NDArray) -> NDArray:
         """

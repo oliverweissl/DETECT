@@ -3,7 +3,9 @@ import torch
 from torch import Tensor
 from torch.utils.data import Dataset
 import numpy as np
+from datetime import datetime
 from objective_functions import get_accuracy, get_penalized_distance
+from models import StyleMixer, CandidateList, MixCandidate
 from learner import Learner
 from typing import Callable, Any
 from numpy.typing import NDArray
@@ -13,6 +15,7 @@ class NeuralTester:
 
     _predictor: nn.Module
     _generator: nn.Module
+    _mixer: StyleMixer
     _learner: Learner
 
     _predictor_evaluation_function: Callable[[Tensor, Tensor], float]
@@ -43,6 +46,7 @@ class NeuralTester:
         self._predictor = predictor
         self._generator = generator
         self._learner = learner
+        self._mixer = StyleMixer(generator, torch.device("cuda"), (1, 15))
 
         self._predictor_evaluation_function = predictor_evaluation_function
         self._learner_evaluation_function = learner_evaluation_function
@@ -57,54 +61,36 @@ class NeuralTester:
 
         :param input_dataset: The dataset to test.
         """
-        for X, y in input_dataset:
+        for X, y in input_dataset:  # X: img, y: 1xC
             y_hat = self._predictor(X)
             first, second, *_ = torch.argsort(y_hat)
 
             if torch.argmax(y) != first:  # We are only interested in checking the boundary if the prediction matches the label
                 continue
 
-            seed, seed_p = self._get_seed(y), self._get_seed(second)
+            """The candidate usage could be better!!"""
+            c1, c2 = MixCandidate(label=first, is_w0=True), MixCandidate(label=second)
+            candidates = CandidateList(c1, c2)
+
             for _ in range(self._generations):
-                mixed_images = self._mix_seeds(seed, seed_p, self._learner.x_current)
-                predictions = self._predictor(mixed_images)
+                smx_indices_arr, smx_weights_arr = self._learner.get_x_current
 
-                fitnesses = np.array([self._learner_evaluation_function(X, Xp, y, yp) for Xp, yp in zip(mixed_images, predictions)])
-                self._learner.new_population(fitnesses)
+                images = []
+                for smx_indices, smx_weights in zip(smx_indices_arr, smx_weights_arr):
+                    mixed_image = self._mixer.mix(
+                        candidates=candidates,
+                        smx_indices=smx_indices,
+                        smx_weights=smx_weights,
+                        random_seed=self._get_random_seed(),
+                    )
+                    images.append(mixed_image)
 
+                predictions = self._predictor(images)
+                fitness = np.array([self._learner_evaluation_function(X, Xp, y, yp) for Xp, yp in zip(images, predictions)])
+                self._learner.new_population(fitness)
 
-    def _get_seed(self, y: NDArray) -> Any:
-        """
-        Get a seed from a specific label.
-
-        :param y: The class lable.
-        :returns: The seed element.
-        """
-        pass
-
-    def _mix_seeds(self, seed, seed_p, genomes:NDArray) -> Tensor:
-        """
-        Mix seeds to get new input images based on genomes.
-
-        :param seed: The initial seed.
-        :param seed_p: The second seed.
-        :param genomes: The genomes for mixing.
-        :return: The generated images.
-        """
-        pass
-
-    # TODO -> Class as vector
-    # All classes concatenate
-    # seeds are a list ?? tf is this
-    # w0 seeds are matrices -> num(seeds) x label vec
-
-
-    # All zs -> latent noise x number of seeds
-
-    # -> then map zs to classes using mapping network
-    # for final W`s -> wetake all weights of seeds and apply their weights --> is this new dimension to our genome??
-
-
-
-
-
+    @staticmethod
+    def _get_random_seed() -> int:
+        now = datetime.now()
+        rand = np.random.randint(int(round(now.timestamp())))
+        return rand
