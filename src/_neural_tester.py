@@ -1,14 +1,14 @@
-from torch import nn
 import torch
+import numpy as np
+from torch import nn
 from torch import Tensor
 from torch.utils.data import Dataset
-import numpy as np
 from datetime import datetime
-from objective_functions import get_accuracy, get_penalized_distance
-from models import StyleMixer, CandidateList, MixCandidate
-from learner import Learner
-from typing import Callable, Any
+from typing import Callable
 from numpy.typing import NDArray
+
+from style_mixer import StyleMixer, CandidateList, MixCandidate
+from learner import Learner
 
 class NeuralTester:
     """A tester class for neural style mixing."""
@@ -30,7 +30,7 @@ class NeuralTester:
             generator: nn.Module,
             learner: Learner,
             predictor_evaluation_function: Callable[[Tensor, Tensor], float],
-            learner_evaluation_function: Callable[[NDArray, NDArray, int, int], float],
+            learner_evaluation_function: Callable[[Tensor, Tensor, int, int], float],
             generations: int,
             ):
         """
