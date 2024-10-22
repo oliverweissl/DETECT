@@ -8,7 +8,7 @@ from ._mix_candidate import CandidateList
 
 class StyleMixer:
     """
-    A class geared towards style-mixing.
+    A class geared towards style-mixing using style layers in a GAN.
 
     This class is heavily influenced by the Renderer class in the StyleGAN3 repo.
     """
@@ -52,8 +52,8 @@ class StyleMixer:
         This function is heavily inspired by the Renderer class of the original StyleGANv3 codebase.
 
         :param candidates: The candidates used for style-mixing.
-        :param smx_cond: The style mix strategy.
-        :param smx_weights: The weights for mixing.
+        :param smx_cond: The style mix conditions (layer combinations).
+        :param smx_weights: The weights for mixing layers.
         :param random_seed: The seed for randomization.
         :param noise_mode: The noise to use for style generation (const, random).
         :returns: The generated image (C x H x W).
@@ -72,6 +72,7 @@ class StyleMixer:
         all_cs = np.zeros([num_candidates, self._generator.c_dim], dtype=np.float32)  # Input classes
         all_cs[list(range(num_candidates)), candidates.labels] = 1  # Set classes in class vector
 
+        # Custom cast to device by NVIDIA
         all_zs = self._to_device(torch.from_numpy(all_zs))
         all_cs = self._to_device(torch.from_numpy(all_cs))
 
@@ -87,10 +88,10 @@ class StyleMixer:
         """
         Here we do style mixing.
 
-        Since we want to mix w0 with wn we take the ws in wn to mix and apply their weights..
+        Since we want to mix w0 with wn we take the ws in wn to mix and apply their weights.
+        smx indices do not contain w0  --> the index of wn in all_ws is different to index of wn in smx_indices.
+        Here we convert the indices to condition such that we know which w to take for each layer (If only one candidate this is array of equal integers).
         """
-        # Since smx indices do not contain w0 the index of wn in all_ws is different to index of wn in smx_indices.
-        # Here we convert the indices to condition such that we know which w to take for each layer (If only one candidate this is array of equal integers).
         wn_w_cond = [candidates.wn_candidates.w_indices[cond] for cond in smx_cond]
         smw_tensor = torch.as_tensor(smx_weights, device=self._device)[:, None]  # |_mix_dims| x 1
         w[self._mix_dims] += all_ws[wn_w_cond, self._mix_dims] * smw_tensor + w0[self._mix_dims] * -(smw_tensor-1)
