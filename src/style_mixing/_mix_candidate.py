@@ -21,8 +21,8 @@ class CandidateList(UserList):
     _weights: list[float] | None
     _labels: list[int] | None
     _w_indices: list[int] | None
-    _w0_candidates: CandidateList
-    _wn_candidates: CandidateList
+    _w0_candidates: CandidateList | None
+    _wn_candidates: CandidateList | None
 
     def __init__(self, *initial_candidates: MixCandidate):
         super().__init__(initial_candidates)
@@ -41,6 +41,9 @@ class CandidateList(UserList):
         self._weights = [elem.weight for elem in self.data]
         self._labels = [elem.label for elem in self.data]
         self._w_indices = [elem.w_index for elem in self.data]
+
+        self._w0_candidates = None
+        self._wn_candidates = None
 
     @property
     def weights(self) -> list[float]:

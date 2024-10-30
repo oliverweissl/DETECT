@@ -3,8 +3,6 @@
 *.pkl
 *.ipynb
 *.json*
-gcc
-g++
 __pycache__
 datasets/*.zip
 **/_artifacts/

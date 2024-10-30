@@ -38,10 +38,9 @@ def generate_output(
             m = np.linalg.inv(m)
             generator.synthesis.input.transform.copy_(torch.from_numpy(m))
 
-        seed = generator(z, label, noise_mode="const")
+        seed = generator(z, label, noise_mode="random")
         image = (seed.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
         images.append(image)
-
     return images
 
 

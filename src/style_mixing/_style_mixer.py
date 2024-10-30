@@ -94,11 +94,11 @@ class StyleMixer:
         """
         wn_w_cond = [candidates.wn_candidates.w_indices[cond] for cond in smx_cond]
         smw_tensor = torch.as_tensor(smx_weights, device=self._device)[:, None]  # |_mix_dims| x 1
-        w[self._mix_dims] += all_ws[wn_w_cond, self._mix_dims] * smw_tensor + w0[self._mix_dims] * -(smw_tensor-1)
+        w[:,self._mix_dims] += all_ws[wn_w_cond, self._mix_dims, :] * smw_tensor + w0[:,self._mix_dims] * (torch.ones_like(smw_tensor, device=self._device) - smw_tensor)
         w = w / 2 + ws_average
 
         torch.manual_seed(random_seed)
-        out, _ = self._run_synthesis_net(self._generator.synthesis, w[None,:,:], noise_mode=noise_mode, force_fp32=False)
+        out, _ = self._run_synthesis_net(self._generator.synthesis, w, noise_mode=noise_mode, force_fp32=False)
 
         """Convert the output to an image format."""
         sel = out[0].to(torch.float32)  # 1 x C x W x H -> C x W x H
