@@ -6,8 +6,8 @@ from torch.utils.data import Dataset
 from datetime import datetime
 from typing import Callable
 
-from style_mixing import StyleMixer, CandidateList, MixCandidate
-from learner import Learner
+from .style_mixing import StyleMixer, CandidateList, MixCandidate
+from .learner import Learner
 
 class NeuralTester:
     """A tester class for neural style mixing."""
@@ -18,8 +18,7 @@ class NeuralTester:
     _learner: Learner
 
     """Evaluation functions."""
-    _predictor_evaluation_function: Callable[[Tensor, Tensor], float]
-    _learner_evaluation_function: Callable[[Tensor, Tensor, int, int], float]
+    _objective_function: Callable[[Tensor, Tensor, int, int], float]
 
     """Additional Parameters."""
     _num_generations: int
@@ -32,10 +31,9 @@ class NeuralTester:
             predictor: nn.Module,
             generator: nn.Module,
             learner: Learner,
-            predictor_evaluation_function: Callable[[Tensor, Tensor], float],
-            learner_evaluation_function: Callable[[Tensor, Tensor, int, int], float],
+            objective_function: Callable[[Tensor, Tensor, int, int], float],
             num_generations: int,
-            mix_dim_range: tuple[int, int] = (1,15),
+            mix_dim_range: tuple[int, int],
             num_w0: int = 1,
             num_ws: int = 1,
             ):
@@ -45,8 +43,7 @@ class NeuralTester:
         :param predictor: The predictor network to test boundaries for.
         :param generator: Thy style mixer, that generates new inputs.
         :param learner: The learner to find boundary candidates.
-        :param predictor_evaluation_function: The evaluation function  for the predictor network.
-        :param learner_evaluation_function: The evaluation function for the learner.
+        :param objective_function: The evaluation function for the learner.
         :param num_generations: The number of generations for the Learner.
         :param mix_dim_range: The range of layers available for style mixing (default 1-15).
         :param num_w0: The number of w0 seeds to be generated.
@@ -57,8 +54,7 @@ class NeuralTester:
         self._learner = learner
         self._mixer = StyleMixer(generator, torch.device("cuda"), mix_dim_range)
 
-        self._predictor_evaluation_function = predictor_evaluation_function
-        self._learner_evaluation_function = learner_evaluation_function
+        self._objective_function = objective_function
 
         self._num_generations = num_generations
         self._num_w0 = num_w0
@@ -91,6 +87,7 @@ class NeuralTester:
             # Now we run a search-based optimization strategy to find a good boundary candidate.
             for _ in range(self._generations):
                 smx_cond_arr, smx_weights_arr = self._learner.get_x_current  # Get the initial population of style mixing conditions and weights
+                assert 0 <= max(smx_cond_arr) < len(wsc), f"Error: StyleMixing Conditions reference indices of {max(smx_cond_arr)}, but we only have {len(wsc)} elements."
 
                 images = []
                 # TODO: investigate if this mixing can be parallelized
@@ -104,7 +101,7 @@ class NeuralTester:
                     images.append(mixed_image)
 
                 predictions = self._predictor(images)
-                fitness = np.array([self._learner_evaluation_function(X, Xp, y, yp) for Xp, yp in zip(images, predictions)])
+                fitness = np.array([self._objective_function(X, Xp, y, yp) for Xp, yp in zip(images, predictions)])
                 self._learner.new_population(fitness)  # Generate a new population based on previous performance
 
     @staticmethod

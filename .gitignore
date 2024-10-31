@@ -1,8 +1,10 @@
 .idea
 .venv
 *.pkl
-*.ipynb
+**/_*.ipynb
 *.json*
 __pycache__
 datasets/*.zip
 **/_artifacts/
+**/*data*/
+wandb/
