@@ -2,6 +2,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.ndimage import gaussian_filter
 
+
 def get_ssim_d2(i1: NDArray, i2: NDArray) -> float:
     """
     Get structural similarity between two images as D_2 metric.
@@ -15,29 +16,30 @@ def get_ssim_d2(i1: NDArray, i2: NDArray) -> float:
     :returns: SSIM score.
     """
     truncate, sigma = 3.5, 1.5
-    assert i1.shape == i2.shape, f"Error: Both images need to be of same size ({i1.shape}, {i2.shape})."
+    assert (
+        i1.shape == i2.shape
+    ), f"Error: Both images need to be of same size ({i1.shape}, {i2.shape})."
     filter_curry = lambda image: gaussian_filter(image, sigma=sigma, truncate=truncate)
     pad = (2 * int(truncate * sigma + 0.5)) // 2
 
     ux, uy = filter_curry(i1), filter_curry(i2)  # local mean of x and y
-    uxx, uyy, uxy = filter_curry(i1*i1), filter_curry(i2*i2), filter_curry(i1*i2)
+    uxx, uyy, uxy = filter_curry(i1 * i1), filter_curry(i2 * i2), filter_curry(i1 * i2)
 
     vx = uxx - ux * ux  # local variance of x
-    vy = uyy - uy * uy # local variance of y
-    vxy = uxy - ux *uy  # local covariance between x and y
+    vy = uyy - uy * uy  # local variance of y
+    vxy = uxy - ux * uy  # local covariance between x and y
 
-    c1 = (0.01*1)**2  # (K1 * Data-Range)²
-    c2 = (0.03*1)**2  # (K2 * Data-Range)²
-
+    c1 = (0.01 * 1) ** 2  # (K1 * Data-Range)²
+    c2 = (0.03 * 1) ** 2  # (K2 * Data-Range)²
 
     a1 = 2 * ux * uy + c1
-    a2 = 2* vxy + c2
+    a2 = 2 * vxy + c2
     b1 = ux**2 + uy**2 + c1
     b2 = vx + vy + c2
 
     s1 = a1 / b1
     s2 = a2 / b2
-    d = np.sqrt(2-s1-s2)
+    d = np.sqrt(2 - s1 - s2)
 
     d2 = d[:, pad:-pad, pad:-pad].mean()
     return d2

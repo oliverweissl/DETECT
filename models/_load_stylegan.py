@@ -1,5 +1,8 @@
 import torch
-import legacy, dnnlib
+
+import dnnlib
+import legacy
+
 
 def load_stylegan(file: str) -> torch.nn.Module:
     """

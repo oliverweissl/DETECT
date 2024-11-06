@@ -1,8 +1,11 @@
-from numpy.typing import NDArray
-import numpy as np
-from src.learner import Learner
 from datetime import datetime
+from typing import Union
+
 import cma
+import numpy as np
+from numpy.typing import NDArray
+
+from src.learner import Learner
 
 
 class CMAESLearner(Learner):
@@ -18,7 +21,9 @@ class CMAESLearner(Learner):
         :param x0: Initial population.
         :param std: Standard deviation of the populations dsitribution.
         """
-        cma_seed = int(datetime.now().timestamp() * 1e6) % 2 ** 32  # Cma seed must be smaller than 2**32.
+        cma_seed = (
+            int(datetime.now().timestamp() * 1e6) % 2**32
+        )  # Cma seed must be smaller than 2**32.
         options = cma.CMAOptions()
         options.set("bounds", [0, 1])
         options.set("seed", cma_seed)
@@ -28,7 +33,6 @@ class CMAESLearner(Learner):
         self._x_current = x0
         self._x_current_continuous = initial_mean
         self._optimizer = cma.CMAEvolutionStrategy(initial_mean, std, options)
-
 
     def new_population(self, fitnesses: NDArray) -> None:
         """
@@ -42,7 +46,7 @@ class CMAESLearner(Learner):
         self._x_current_continuous = new_candidates
         self._x_current = np.round(new_candidates, 0)
 
-    def get_x_current(self) -> tuple[NDArray, NDArray]:
+    def get_x_current(self) -> tuple[Union[NDArray, None], NDArray]:
         """
         Return the current population in specific format.
 

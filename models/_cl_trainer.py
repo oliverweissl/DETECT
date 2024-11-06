@@ -1,25 +1,28 @@
-import torch
-from torch.utils.data import Dataset, DataLoader
-import matplotlib.pyplot as plt
-from torchvision.transforms.functional import to_pil_image
-import wandb
-from dataclasses import dataclass
-from typing import Type
-from datetime import datetime
-from tqdm import tqdm
 import logging
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Type
+
+import matplotlib.pyplot as plt
+import torch
+from torch.utils.data import DataLoader, Dataset
+from torchvision.transforms.functional import to_pil_image
+from tqdm import tqdm
+
+import wandb
 from src.objective_functions import get_accuracy
+
 
 @dataclass
 class TrainConfig:
     """Dataclass for training configs."""
+
     lr: float
     max_lr: float
     epochs: int
     batch: int
     model: str
     dataset: str
-
 
 
 class ClTrainer:
@@ -40,17 +43,18 @@ class ClTrainer:
     _log_inner: bool
 
     def __init__(
-            self,*,
-            train_dataset: Dataset,
-            val_dataset: Dataset,
-            model: torch.nn.Module,
-            criterion: Type[torch.nn.Module],
-            optimizer: Type[torch.optim.Optimizer],
-            scheduler: Type[object],
-            train_config: TrainConfig,
-            out_features: int,
-            workers: int = 2,
-            log_inner: bool = False,
+        self,
+        *,
+        train_dataset: Dataset,
+        val_dataset: Dataset,
+        model: torch.nn.Module,
+        criterion: Type[torch.nn.Module],
+        optimizer: Type[torch.optim.Optimizer],
+        scheduler: Type[object],
+        train_config: TrainConfig,
+        out_features: int,
+        workers: int = 2,
+        log_inner: bool = False,
     ) -> None:
         """
         Initialize the Classifier Trainer object.
@@ -72,8 +76,18 @@ class ClTrainer:
         self._log_inner = log_inner
 
         # Make dataloaders.
-        self._train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=train_config.batch, shuffle=True, num_workers=workers)
-        self._val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=train_config.batch, shuffle=False, num_workers=workers)
+        self._train_loader = torch.utils.data.DataLoader(
+            train_dataset,
+            batch_size=train_config.batch,
+            shuffle=True,
+            num_workers=workers,
+        )
+        self._val_loader = torch.utils.data.DataLoader(
+            val_dataset,
+            batch_size=train_config.batch,
+            shuffle=False,
+            num_workers=workers,
+        )
 
         # Set training components.
         self._model = model
@@ -84,14 +98,11 @@ class ClTrainer:
             self._optimizer,
             max_lr=train_config.max_lr,
             steps_per_epoch=len(self._train_loader),
-            epochs=train_config.epochs
+            epochs=train_config.epochs,
         )
 
         self._model.to(self._device)
-        wandb.init(
-            project="NeuralStyleClassifiers",
-            config=train_config.__dict__
-        )
+        wandb.init(project="NeuralStyleClassifiers", config=train_config.__dict__)
         self._is_trained = False
 
     def train(self) -> None:
@@ -122,7 +133,7 @@ class ClTrainer:
             image = to_pil_image(img)
             plt.imshow(image)
             plt.title(self._label_dict[lab.item()])
-            plt.axis('off')
+            plt.axis("off")
             if i + 2 > size**2:
                 break
         plt.show()
@@ -140,7 +151,7 @@ class ClTrainer:
 
     def _train_epoch(self) -> None:
         self._model.train()
-        tacc, tloss = 0., 0.
+        tacc, tloss = 0.0, 0.0
         for X, y in self._train_loader:
             X, y = X.to(self._device), y.to(self._device)
 
@@ -160,23 +171,22 @@ class ClTrainer:
                     {
                         "acc": acc,
                         "loss": loss.item(),
-                        "lr": self._scheduler.optimizer.param_groups[0]['lr'],
+                        "lr": self._scheduler.optimizer.param_groups[0]["lr"],
                     }
                 )
         if not self._log_inner:
             wandb.log(
                 {
-                    "acc": tacc/len(self._train_loader),
-                    "loss": tloss/len(self._train_loader),
-                    "lr": self._scheduler.optimizer.param_groups[0]['lr'],
+                    "acc": tacc / len(self._train_loader),
+                    "loss": tloss / len(self._train_loader),
+                    "lr": self._scheduler.optimizer.param_groups[0]["lr"],
                 }
             )
-
 
     def _val_epoch(self) -> None:
         self._model.eval()
         with torch.no_grad():
-            tacc, tloss = 0., 0.
+            tacc, tloss = 0.0, 0.0
             for X, y in self._val_loader:
                 X, y = X.to(self._device), y.to(self._device)
                 pred = self._model(X)
@@ -194,7 +204,7 @@ class ClTrainer:
             if not self._log_inner:
                 wandb.log(
                     {
-                        "val_acc": tacc/len(self._val_loader),
-                        "val_loss": tloss/len(self._val_loader),
+                        "val_acc": tacc / len(self._val_loader),
+                        "val_loss": tloss / len(self._val_loader),
                     }
                 )

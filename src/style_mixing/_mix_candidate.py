@@ -1,16 +1,19 @@
 from __future__ import annotations
-from dataclasses import dataclass
+
 from collections import UserList
+from dataclasses import dataclass
+
 import torch
+
 
 @dataclass
 class MixCandidate:
     """A simple container for candidate elements used in style mixing."""
 
     label: int  # The class label of the candidate.
-    is_w0: bool = False # Whether candidate is used for w0 calculation.
-    weight: float = 1.  # The weight of the candidate for w0 calculation.
-    w_index: int | None = None # Index in the w calculation.
+    is_w0: bool = False  # Whether candidate is used for w0 calculation.
+    weight: float = 1.0  # The weight of the candidate for w0 calculation.
+    w_index: int | None = None  # Index in the w calculation.
     w_tensor: torch.Tensor | None = None  # The latent vector if already generated.
 
 
@@ -20,6 +23,7 @@ class CandidateList(UserList):
 
     Note this list object is immutable and caches getters.
     """
+
     _weights: list[float] | None
     _labels: list[int] | None
     _w_indices: list[int] | None
@@ -32,9 +36,11 @@ class CandidateList(UserList):
         max_i = -1
         for i, candidate in enumerate(self.data):
             if not candidate.w_index:
-                candidate.w_index = max(i, max_i+1)
+                candidate.w_index = max(i, max_i + 1)
             elif candidate.w_index <= max_i:
-                raise KeyError(f"Something corrupted the order of this Candidate List: {self._w_indices}")
+                raise KeyError(
+                    f"Something corrupted the order of this Candidate List: {self._w_indices}"
+                )
             max_i = candidate.w_index
 
         self._weights = [elem.weight for elem in self.data]
@@ -64,16 +70,21 @@ class CandidateList(UserList):
     @property
     def w0_candidates(self) -> CandidateList:
         if not self._w0_candidates:
-            self._w0_candidates = CandidateList(*[elem for elem in self.data if elem.is_w0])
+            self._w0_candidates = CandidateList(
+                *[elem for elem in self.data if elem.is_w0]
+            )
         return self._w0_candidates
 
     @property
     def wn_candidates(self) -> CandidateList:
         if not self._wn_candidates:
-            self._wn_candidates = CandidateList(*[elem for elem in self.data if not elem.is_w0])
+            self._wn_candidates = CandidateList(
+                *[elem for elem in self.data if not elem.is_w0]
+            )
         return self._wn_candidates
 
     """Make the list immutable."""
+
     def insert(self, index=None, value=None):
         raise TypeError()
 

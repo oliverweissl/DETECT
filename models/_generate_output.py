@@ -1,14 +1,15 @@
+import numpy as np
 import torch
+from torch import Tensor
+
 import dnnlib
 import legacy
 
-import numpy as np
-from torch import Tensor
 
 def generate_output(
-        model_pkl: str,
-        seeds: list[int],
-        class_index: int,
+    model_pkl: str,
+    seeds: list[int],
+    class_index: int,
 ) -> list[Tensor]:
     """
     Generate datapoint from image.
@@ -26,15 +27,14 @@ def generate_output(
     label = torch.zeros(size=[1, generator.c_dim], device=device)
     label[:, class_index] = 1
 
-
     z_generator = torch.Generator(device=device)
     images = []
     for idx, seed in enumerate(seeds):
         z_generator.manual_seed(seed)
         z = torch.randn(size=[1, generator.z_dim], device=device, generator=z_generator)
 
-        if hasattr(generator.synthesis, 'input'):
-            m = _make_transform((0.,0.), 0.)
+        if hasattr(generator.synthesis, "input"):
+            m = _make_transform((0.0, 0.0), 0.0)
             m = np.linalg.inv(m)
             generator.synthesis.input.transform.copy_(torch.from_numpy(m))
 
@@ -44,10 +44,10 @@ def generate_output(
     return images
 
 
-def _make_transform(translate: tuple[float,float], angle: float):
+def _make_transform(translate: tuple[float, float], angle: float):
     m = np.eye(3)
-    s = np.sin(angle/360.0*np.pi*2)
-    c = np.cos(angle/360.0*np.pi*2)
+    s = np.sin(angle / 360.0 * np.pi * 2)
+    c = np.cos(angle / 360.0 * np.pi * 2)
     m[0][0] = c
     m[0][1] = s
     m[0][2] = translate[0]
@@ -55,5 +55,3 @@ def _make_transform(translate: tuple[float,float], angle: float):
     m[1][1] = c
     m[1][2] = translate[1]
     return m
-
-

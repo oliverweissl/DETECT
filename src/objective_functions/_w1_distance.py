@@ -1,7 +1,9 @@
+import numpy as np
 from numpy.typing import NDArray
 from scipy import sparse
-import numpy as np
-#from scipy.stats import wasserstein_distance_nd
+
+# from scipy.stats import wasserstein_distance_nd
+
 
 def get_w1_distance(u: NDArray, v: NDArray) -> float:
     """
@@ -12,7 +14,6 @@ def get_w1_distance(u: NDArray, v: NDArray) -> float:
     :return: The distance [0,1].
     """
     m, n = len(u), len(v)
-
 
     u /= u.sum()
     v /= v.sum()
@@ -27,6 +28,6 @@ def get_w1_distance(u: NDArray, v: NDArray) -> float:
     v1, v2 = v.shape
     # TODO: this is WIP
 
-    distance = 1 #wasserstein_distance_nd(u, v)
-    assert 1>= distance >= 0, "Distance does something weird."
+    distance = 1  # wasserstein_distance_nd(u, v)
+    assert 1 >= distance >= 0, "Distance does something weird."
     return distance

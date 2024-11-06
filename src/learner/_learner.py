@@ -1,15 +1,16 @@
-from abc import abstractmethod, ABC
-from numpy.typing import NDArray
+from abc import ABC, abstractmethod
 from typing import Union
+
 import numpy as np
+from numpy.typing import NDArray
 
 
 class Learner(ABC):
     """An abstract learner class."""
+
     # Standard elements.
     _best_candidate: tuple[Union[NDArray, None], float]
     _x_current: NDArray
-
 
     @abstractmethod
     def new_population(self, fitnesses: NDArray) -> None:
@@ -21,7 +22,7 @@ class Learner(ABC):
         ...
 
     @abstractmethod
-    def get_x_current(self) -> tuple[NDArray, NDArray]:
+    def get_x_current(self) -> tuple[Union[NDArray, None], NDArray]:
         """
         Return the current population in specific format.
 
@@ -30,7 +31,7 @@ class Learner(ABC):
         ...
 
     @property
-    def best_candidate(self) -> tuple[NDArray, float]:
+    def best_candidate(self) -> tuple[Union[NDArray, None], float]:
         """
         Get the best candidate so far.
 

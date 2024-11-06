@@ -1,8 +1,10 @@
-import torch
 import numpy as np
+import torch
 from torch import Tensor
-from torch_utils.ops import upfirdn2d
+
 import dnnlib
+from torch_utils.ops import upfirdn2d
+
 from ._mix_candidate import CandidateList
 
 
@@ -12,6 +14,7 @@ class StyleMixer:
 
     This class is heavily influenced by the Renderer class in the StyleGAN3 repo.
     """
+
     _generator: torch.nn.Module
     _device: torch.device
     _has_input_transform: bool
@@ -21,10 +24,10 @@ class StyleMixer:
     _z_generator: torch.Generator
 
     def __init__(
-            self,
-            generator: torch.nn.Module,
-            device: torch.device,
-            mix_dims: tuple[int, int]
+        self,
+        generator: torch.nn.Module,
+        device: torch.device,
+        mix_dims: tuple[int, int],
     ):
         """
         Initialize the StyleMixer object.
@@ -33,21 +36,25 @@ class StyleMixer:
         :param device: The torch device to use (should be cuda).
         :param mix_dims: The w-dimensions to use for mixing (range index).
         """
-        self._generator=generator
-        self._device=device
-        self._has_input_transform = (hasattr(generator.synthesis, 'input') and hasattr(generator.synthesis.input, 'transform'))
+        self._generator = generator
+        self._device = device
+        self._has_input_transform = hasattr(generator.synthesis, "input") and hasattr(
+            generator.synthesis.input, "transform"
+        )
         self._pinned_bufs = {}
-        self._mix_dims = torch.arange(*mix_dims, device=self._device)  # Dimensions of w -> we only want to mix style layers.
+        self._mix_dims = torch.arange(
+            *mix_dims, device=self._device
+        )  # Dimensions of w -> we only want to mix style layers.
 
         self._z_generator = torch.Generator(device=self._device)
 
     def mix(
-            self,
-            candidates: CandidateList,
-            smx_cond: list[int],
-            smx_weights: list[float],
-            random_seed: int = 0,
-            noise_mode: str = "random",
+        self,
+        candidates: CandidateList,
+        smx_cond: list[int],
+        smx_weights: list[float],
+        random_seed: int = 0,
+        noise_mode: str = "random",
     ) -> Tensor:
         """
         Generate data using style mixing.
@@ -61,7 +68,9 @@ class StyleMixer:
         :param noise_mode: The noise to use for style generation (const, random).
         :returns: The generated image (C x H x W) as float with range [0, 1].
         """
-        assert len(smx_cond) == len(smx_weights), "Error: The parameters have to be of same length."
+        assert len(smx_cond) == len(
+            smx_weights
+        ), "Error: The parameters have to be of same length."
 
         if self._has_input_transform:
             m = np.eye(3)
@@ -71,25 +80,43 @@ class StyleMixer:
         """Generate latents for wn."""
         num_candidates = len(candidates.wn_candidates)
 
-        all_zs = np.zeros([num_candidates, self._generator.z_dim], dtype=np.float32)  # Latent inputs
-        all_cs = np.zeros([num_candidates, self._generator.c_dim], dtype=np.float32)  # Input classes
-        all_cs[list(range(num_candidates)), candidates.wn_candidates.labels] = 1  # Set classes in class vector
+        all_zs = np.zeros(
+            [num_candidates, self._generator.z_dim], dtype=np.float32
+        )  # Latent inputs
+        all_cs = np.zeros(
+            [num_candidates, self._generator.c_dim], dtype=np.float32
+        )  # Input classes
+        all_cs[list(range(num_candidates)), candidates.wn_candidates.labels] = (
+            1  # Set classes in class vector
+        )
 
         # Custom cast to device by NVIDIA
         all_zs = self._to_device(torch.from_numpy(all_zs))
         all_cs = self._to_device(torch.from_numpy(all_cs))
 
         ws_average = self._generator.mapping.w_avg
-        all_ws = self._generator.mapping(z=all_zs, c=all_cs, truncation_psi=1, truncation_cutoff=0) - ws_average
+        all_ws = (
+            self._generator.mapping(
+                z=all_zs, c=all_cs, truncation_psi=1, truncation_cutoff=0
+            )
+            - ws_average
+        )
 
         """Get candidates for w0 calculation."""
-        w0_weights, w0_tensors = candidates.w0_candidates.weights, candidates.w0_candidates.w_tensors
-        assert sum(w0_weights) == 1, f"Error: w0 weight do not sum up to one: {w0_weights}."
+        w0_weights, w0_tensors = (
+            candidates.w0_candidates.weights,
+            candidates.w0_candidates.w_tensors,
+        )
+        assert (
+            sum(w0_weights) == 1
+        ), f"Error: w0 weight do not sum up to one: {w0_weights}."
         weight_tensor = torch.as_tensor(w0_weights, device=self._device)[:, None, None]
         w0_tensors = torch.stack(w0_tensors) - ws_average
 
         w0 = (w0_tensors * weight_tensor).sum(dim=0)  # Initialize base using w0 seeds.
-        w = w0.clone().detach()  # Clone w0 for calculation of w -> we want them seperate.
+        w = torch.zeros_like(
+            w0, device=self._device, dtype=torch.float32
+        )  # Empty w vector
         """
         Here we do style mixing.
 
@@ -98,17 +125,27 @@ class StyleMixer:
         Here we convert the indices to condition such that we know which w to take for each layer (If only one candidate this is array of equal integers).
         """
         # wn_w_cond = [candidates.wn_candidates.w_indices[cond] for cond in smx_cond]
-        smw_tensor = torch.as_tensor(smx_weights, device=self._device)[:, None]  # |_mix_dims| x 1
-        assert (lmd := len(self._mix_dims)) == (lsmx := len(smx_cond)), f"Error SMX condition array is not the same size as the mix dimensions ({lmd} vs {lsmx}). This might be due to a mismatch in genome size."
-        w[:,self._mix_dims] += all_ws[smx_cond, self._mix_dims, :] * smw_tensor + w0[:,self._mix_dims] * (torch.ones_like(smw_tensor, device=self._device) - smw_tensor)
-        w = w / 2 + ws_average
+        smw_tensor = torch.as_tensor(smx_weights, device=self._device)[
+            :, None
+        ]  # |_mix_dims| x 1
+        assert (lmd := len(self._mix_dims)) == (
+            lsmx := len(smx_cond)
+        ), f"Error SMX condition array is not the same size as the mix dimensions ({lmd} vs {lsmx}). This might be due to a mismatch in genome size."
+        w[:, self._mix_dims] += all_ws[smx_cond, self._mix_dims, :] * smw_tensor + w0[
+            :, self._mix_dims
+        ] * (torch.ones_like(smw_tensor, device=self._device) - smw_tensor)
+        w += ws_average
 
         torch.manual_seed(random_seed)
-        out, _ = self._run_synthesis_net(self._generator.synthesis, w, noise_mode=noise_mode, force_fp32=False)
+        out, _ = self._run_synthesis_net(
+            self._generator.synthesis, w, noise_mode=noise_mode, force_fp32=False
+        )
 
         """Convert the output to an image format."""
         sel = out[0].to(torch.float32)  # 1 x C x W x H -> C x W x H
-        img = sel / sel.norm(float('inf'), dim=[1, 2], keepdim=True).clip(1e-8, 1e8)  # Normalize color range.
+        img = sel / sel.norm(float("inf"), dim=[1, 2], keepdim=True).clip(
+            1e-8, 1e8
+        )  # Normalize color range.
         return img
 
     def generate_X_w0(self, seed: int, class_idx: int) -> tuple[Tensor, Tensor]:
@@ -121,15 +158,20 @@ class StyleMixer:
         """
         self._z_generator.manual_seed(seed)
 
-        z = torch.randn(size=[1, self._generator.z_dim], device=self._device, generator=self._z_generator)  # Generate latent vector for X
+        z = torch.randn(
+            size=[1, self._generator.z_dim],
+            device=self._device,
+            generator=self._z_generator,
+        )  # Generate latent vector for X
         label = torch.zeros(size=[1, self._generator.c_dim], device=self._device)
-        w = self._generator.mapping(z=z, c=label, truncation_psi=1, truncation_cutoff=0) - self._generator.mapping.w_avg
+        w = (
+            self._generator.mapping(z=z, c=label, truncation_psi=1, truncation_cutoff=0)
+            - self._generator.mapping.w_avg
+        )
         label[:, class_idx] = 1
 
         X = self._generator(z, label, noise_mode="random")
         return X, w
-
-
 
     # ------------------ Copied from https://github.com/NVlabs/stylegan3/blob/main/viz/renderer.py -----------------------
     def _get_pinned_buf(self, ref):
@@ -144,30 +186,34 @@ class StyleMixer:
         return self._get_pinned_buf(buf).copy_(buf).to(self._device)
 
     @staticmethod
-    def _run_synthesis_net(net, *args, capture_layer=None, **kwargs): # => out, layers
+    def _run_synthesis_net(net, *args, capture_layer=None, **kwargs):  # => out, layers
         submodule_names = {mod: name for name, mod in net.named_modules()}
         unique_names = set()
         layers = []
 
         def module_hook(module, _inputs, outputs):
             outputs = list(outputs) if isinstance(outputs, (tuple, list)) else [outputs]
-            outputs = [out for out in outputs if isinstance(out, torch.Tensor) and out.ndim in [4, 5]]
+            outputs = [
+                out
+                for out in outputs
+                if isinstance(out, torch.Tensor) and out.ndim in [4, 5]
+            ]
             for idx, out in enumerate(outputs):
-                if out.ndim == 5: # G-CNN => remove group dimension.
+                if out.ndim == 5:  # G-CNN => remove group dimension.
                     out = out.mean(2)
                 name = submodule_names[module]
-                if name == '':
-                    name = 'output'
+                if name == "":
+                    name = "output"
                 if len(outputs) > 1:
-                    name += f':{idx}'
+                    name += f":{idx}"
                 if name in unique_names:
                     suffix = 2
-                    while f'{name}_{suffix}' in unique_names:
+                    while f"{name}_{suffix}" in unique_names:
                         suffix += 1
-                    name += f'_{suffix}'
+                    name += f"_{suffix}"
                 unique_names.add(name)
                 shape = [int(x) for x in out.shape]
-                dtype = str(out.dtype).split('.')[-1]
+                dtype = str(out.dtype).split(".")[-1]
                 layers.append(dnnlib.EasyDict(name=name, shape=shape, dtype=dtype))
                 if name == capture_layer:
                     raise CaptureSuccess(out)
@@ -203,22 +249,30 @@ class StyleMixer:
 
         # Resample image.
         y = upfirdn2d.upsample2d(x=x, f=f, up=up, padding=p)
-        z = torch.nn.functional.grid_sample(y, g, mode='bilinear', padding_mode='zeros', align_corners=False)
+        z = torch.nn.functional.grid_sample(
+            y, g, mode="bilinear", padding_mode="zeros", align_corners=False
+        )
 
         # Form mask.
         m = torch.zeros_like(y)
         c = p * 2 + 1
         m[:, :, c:-c, c:-c] = 1
-        m = torch.nn.functional.grid_sample(m, g, mode='nearest', padding_mode='zeros', align_corners=False)
+        m = torch.nn.functional.grid_sample(
+            m, g, mode="nearest", padding_mode="zeros", align_corners=False
+        )
         return z, m
 
 
-def _construct_affine_bandlimit_filter(mat, a=3, amax=16, aflt=64, up=4, cutoff_in=1, cutoff_out=1):
+def _construct_affine_bandlimit_filter(
+    mat, a=3, amax=16, aflt=64, up=4, cutoff_in=1, cutoff_out=1
+):
     assert a <= amax < aflt
     mat = torch.as_tensor(mat).to(torch.float32)
 
     # Construct 2D filter taps in input & output coordinate spaces.
-    taps = ((torch.arange(aflt * up * 2 - 1, device=mat.device) + 1) / up - aflt).roll(1 - aflt * up)
+    taps = ((torch.arange(aflt * up * 2 - 1, device=mat.device) + 1) / up - aflt).roll(
+        1 - aflt * up
+    )
     yi, xi = torch.meshgrid(taps, taps)
     xo, yo = (torch.stack([xi, yi], dim=2) @ mat[:2, :2].t()).unbind(2)
 
@@ -237,20 +291,23 @@ def _construct_affine_bandlimit_filter(mat, a=3, amax=16, aflt=64, up=4, cutoff_
 
     # Finalize.
     c = (aflt - amax) * up
-    f = f.roll([aflt * up - 1] * 2, dims=[0,1])[c:-c, c:-c]
+    f = f.roll([aflt * up - 1] * 2, dims=[0, 1])[c:-c, c:-c]
     f = torch.nn.functional.pad(f, [0, 1, 0, 1]).reshape(amax * 2, up, amax * 2, up)
-    f = f / f.sum([0,2], keepdim=True) / (up ** 2)
+    f = f / f.sum([0, 2], keepdim=True) / (up**2)
     f = f.reshape(amax * 2 * up, amax * 2 * up)[:-1, :-1]
     return f
 
+
 def _sinc(x):
     y = (x * np.pi).abs()
-    z = torch.sin(y) / y.clamp(1e-30, float('inf'))
+    z = torch.sin(y) / y.clamp(1e-30, float("inf"))
     return torch.where(y < 1e-30, torch.ones_like(x), z)
+
 
 def _lanczos_window(x, a):
     x = x.abs() / a
     return torch.where(x < 1, _sinc(x), torch.zeros_like(x))
+
 
 class CaptureSuccess(Exception):
     def __init__(self, out):

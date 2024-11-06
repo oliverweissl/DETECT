@@ -1,7 +1,10 @@
-from typing import Callable
-from numpy.typing import NDArray
+from typing import Callable, Union
+
 import numpy as np
+from numpy.typing import NDArray
+
 from ._learner import Learner
+
 
 class GeneticLearner(Learner):
     """A learner based on genetic algorithm."""
@@ -14,10 +17,11 @@ class GeneticLearner(Learner):
 
     @staticmethod
     def _mutate(x: int, p: float, mr: float) -> int:
-        return 1-x if p < mr else x
+        return 1 - x if p < mr else x
 
-
-    def __init__(self, x0: NDArray, population_size: int, mutation_rate: float = 0.05) -> None:
+    def __init__(
+        self, x0: NDArray, population_size: int, mutation_rate: float = 0.05
+    ) -> None:
         """
         Initialize the genetic learner.
 
@@ -37,16 +41,24 @@ class GeneticLearner(Learner):
 
         :param fitnesses: The fitness of old population.
         """
-        parents = self._tournament_selection(self._x_current, fitnesses, self._population_size)
-        indices = np.vstack(np.split(np.random.choice(self._population_size, replace=False), 2))
+        parents = self._tournament_selection(
+            self._x_current, fitnesses, self._population_size
+        )
+        indices = np.vstack(
+            np.split(np.random.choice(self._population_size, replace=False), 2)
+        )
         probabilities = np.random.rand(len(indices))
-        new_individuals = np.array([self._crossover(parents[a] ,parents[b]) for a,b in indices])
+        new_individuals = np.array(
+            [self._crossover(parents[a], parents[b]) for a, b in indices]
+        )
         children = self._vec_mutate(new_individuals, probabilities, self._mutation_rate)
 
         self._x_current = parents + children
 
     @staticmethod
-    def _tournament_selection(population: NDArray, fitnesses: NDArray, to_keep: int, k: int = 2) -> NDArray:
+    def _tournament_selection(
+        population: NDArray, fitnesses: NDArray, to_keep: int, k: int = 2
+    ) -> NDArray:
         """
         Generate a new subset of individuals based on tournament.
 
@@ -70,7 +82,7 @@ class GeneticLearner(Learner):
         return np.array(winners)
 
     @staticmethod
-    def _crossover(xa:NDArray, xb:NDArray) -> NDArray:
+    def _crossover(xa: NDArray, xb: NDArray) -> NDArray:
         """
         One point crossover.
 
@@ -78,13 +90,22 @@ class GeneticLearner(Learner):
         :param xb: The second individual.
         :returns: The new genome.
         """
-        assert (l:=len(xa)) == len(xb)
+        assert (l := len(xa)) == len(xb)
         return np.concatenate(xa[:l], xb[l:])
 
-    def get_x_current(self) -> tuple[NDArray, NDArray]:
+    def get_x_current(self) -> tuple[Union[NDArray, None], NDArray]:
         """
         Return the current population in specific format.
 
         :return: The population as array of smx indices and smx weights.
         """
-        raise NotImplemented
+        """
+                Return the current population in specific format.
+
+                :return: The population as array of smx conditions and smx weights.
+                """
+        smx_cond = np.zeros_like(
+            self._x_current
+        )  # TODO: for now only one element can be used to mix styles -> should be n elements.
+        smx_weights = self._x_current
+        return smx_cond, smx_weights
