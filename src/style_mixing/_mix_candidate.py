@@ -1,6 +1,7 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from collections import UserList
+import torch
 
 @dataclass
 class MixCandidate:
@@ -10,6 +11,7 @@ class MixCandidate:
     is_w0: bool = False # Whether candidate is used for w0 calculation.
     weight: float = 1.  # The weight of the candidate for w0 calculation.
     w_index: int | None = None # Index in the w calculation.
+    w_tensor: torch.Tensor | None = None  # The latent vector if already generated.
 
 
 class CandidateList(UserList):
@@ -35,12 +37,10 @@ class CandidateList(UserList):
                 raise KeyError(f"Something corrupted the order of this Candidate List: {self._w_indices}")
             max_i = candidate.w_index
 
-        if not any((elem.is_w0 for elem in self.data)):  # If none of candidates are w0 we take first candidate as w0.
-            self.data[0].is_w0 = True
-
         self._weights = [elem.weight for elem in self.data]
         self._labels = [elem.label for elem in self.data]
         self._w_indices = [elem.w_index for elem in self.data]
+        self._w_tensors = [elem.w_tensor for elem in self.data]
 
         self._w0_candidates = None
         self._wn_candidates = None
@@ -56,6 +56,10 @@ class CandidateList(UserList):
     @property
     def w_indices(self) -> list[int]:
         return self._w_indices
+
+    @property
+    def w_tensors(self) -> list[torch.Tensor | None]:
+        return self._w_tensors
 
     @property
     def w0_candidates(self) -> CandidateList:

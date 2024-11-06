@@ -1,5 +1,6 @@
-from ._ssim import get_ssim
+from ._ssim import get_ssim_d2
 from torch import Tensor
+import numpy as np
 
 
 def get_penalized_distance(img:Tensor, p_img:Tensor, y_img:int, y_p_img:int) -> float:
@@ -12,5 +13,5 @@ def get_penalized_distance(img:Tensor, p_img:Tensor, y_img:int, y_p_img:int) -> 
     :param y_p_img: The perturbed images label.
     :return: The distance measure [0,1].
     """
-    distance = (1-get_ssim(img.numpy(), p_img.numpy())) ** (0 if y_p_img == y_img else 1)
+    distance = (np.sqrt(2)-get_ssim_d2(img.cpu().numpy(), p_img.cpu().numpy())) ** (0 if y_p_img == y_img else 1)
     return distance

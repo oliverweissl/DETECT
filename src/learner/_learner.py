@@ -1,12 +1,16 @@
 from abc import abstractmethod, ABC
 from numpy.typing import NDArray
+from typing import Union
+import numpy as np
+import logging
 
 
 class Learner(ABC):
     """An abstract learner class."""
     # Standard elements.
-    _best_candidate: tuple[NDArray, float]
+    _best_candidate: tuple[Union[NDArray, None], float]
     _x_current: NDArray
+
 
     @abstractmethod
     def new_population(self, fitnesses: NDArray) -> None:
@@ -34,3 +38,8 @@ class Learner(ABC):
         :return: The candidate.
         """
         return self._best_candidate
+
+    def reset(self) -> None:
+        """Reset the learner to default."""
+        self._best_candidate = (None, np.inf)
+        self._x_current = np.random.rand(*self._x_current.shape)

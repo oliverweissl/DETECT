@@ -47,6 +47,7 @@ class ClTrainer:
             optimizer: Type[torch.optim.Optimizer],
             scheduler: Type[object],
             train_config: TrainConfig,
+            out_features: int,
             workers: int = 2,
             log_inner: bool = False,
     ) -> None:
@@ -60,6 +61,7 @@ class ClTrainer:
         :param optimizer: The optimizer for training (not initialized).
         :param scheduler: The scheduler for lr adaptation (not initialized).
         :param train_config: The training config.
+        :param out_features: Adapt the FC layaer at the end of the model to fit class info.
         :param workers: The number of workers for data loaders (default=2).
         :param log_inner: If wandb logging should log step in epoch.
         """
@@ -74,6 +76,7 @@ class ClTrainer:
 
         # Set training components.
         self._model = model
+        self._model.fc = torch.nn.Linear(model.fc.in_features, out_features)
         self._criterion = criterion()
         self._optimizer = optimizer(model.parameters(), lr=train_config.lr)
         self._scheduler = scheduler(

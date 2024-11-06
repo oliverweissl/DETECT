@@ -1,3 +1,5 @@
+import logging
+
 import torch
 import numpy as np
 from torch import Tensor
@@ -18,6 +20,7 @@ class StyleMixer:
 
     _pinned_bufs: dict  # Custom buffer for GPU? NVIDIA stuff I guess.
     _mix_dims: Tensor  # Range for dimensions to mix styles with.
+    _z_generator: torch.Generator
 
     def __init__(
             self,
@@ -38,6 +41,8 @@ class StyleMixer:
         self._pinned_bufs = {}
         self._mix_dims = torch.arange(*mix_dims, device=self._device)  # Dimensions of w -> we only want to mix style layers.
 
+        self._z_generator = torch.Generator(device=self._device)
+
     def mix(
             self,
             candidates: CandidateList,
@@ -56,7 +61,7 @@ class StyleMixer:
         :param smx_weights: The weights for mixing layers.
         :param random_seed: The seed for randomization.
         :param noise_mode: The noise to use for style generation (const, random).
-        :returns: The generated image (C x H x W).
+        :returns: The generated image (C x H x W) as float with range [0, 1].
         """
         assert len(smx_cond) == len(smx_weights), "Error: The parameters have to be of same length."
 
@@ -65,12 +70,12 @@ class StyleMixer:
             # TODO: maybe add custom transformations
             self._generator.synthesis.input.transform.copy_(torch.from_numpy(m))
 
-        """Generate latents."""
-        num_candidates = len(candidates)
+        """Generate latents for wn."""
+        num_candidates = len(candidates.wn_candidates)
 
         all_zs = np.zeros([num_candidates, self._generator.z_dim], dtype=np.float32)  # Latent inputs
         all_cs = np.zeros([num_candidates, self._generator.c_dim], dtype=np.float32)  # Input classes
-        all_cs[list(range(num_candidates)), candidates.labels] = 1  # Set classes in class vector
+        all_cs[list(range(num_candidates)), candidates.wn_candidates.labels] = 1  # Set classes in class vector
 
         # Custom cast to device by NVIDIA
         all_zs = self._to_device(torch.from_numpy(all_zs))
@@ -80,10 +85,12 @@ class StyleMixer:
         all_ws = self._generator.mapping(z=all_zs, c=all_cs, truncation_psi=1, truncation_cutoff=0) - ws_average
 
         """Get candidates for w0 calculation."""
-        w0_weights, w0_w_indices = candidates.w0_candidates.weights, candidates.w0_candidates.w_indices
+        w0_weights, w0_tensors = candidates.w0_candidates.weights, candidates.w0_candidates.w_tensors
         assert sum(w0_weights) == 1, f"Error: w0 weight do not sum up to one: {w0_weights}."
         weight_tensor = torch.as_tensor(w0_weights, device=self._device)[:, None, None]
-        w0 = (all_ws[w0_w_indices] * weight_tensor).sum(dim=0, keepdim=True)  # Initialize base using w0 seeds.
+        w0_tensors = torch.stack(w0_tensors) - ws_average
+
+        w0 = (w0_tensors * weight_tensor).sum(dim=0)  # Initialize base using w0 seeds.
         w = w0.clone().detach()  # Clone w0 for calculation of w -> we want them seperate.
         """
         Here we do style mixing.
@@ -92,9 +99,10 @@ class StyleMixer:
         smx indices do not contain w0  --> the index of wn in all_ws is different to index of wn in smx_indices.
         Here we convert the indices to condition such that we know which w to take for each layer (If only one candidate this is array of equal integers).
         """
-        wn_w_cond = [candidates.wn_candidates.w_indices[cond] for cond in smx_cond]
+        # wn_w_cond = [candidates.wn_candidates.w_indices[cond] for cond in smx_cond]
         smw_tensor = torch.as_tensor(smx_weights, device=self._device)[:, None]  # |_mix_dims| x 1
-        w[:,self._mix_dims] += all_ws[wn_w_cond, self._mix_dims, :] * smw_tensor + w0[:,self._mix_dims] * (torch.ones_like(smw_tensor, device=self._device) - smw_tensor)
+        assert (lmd := len(self._mix_dims)) == (lsmx := len(smx_cond)), f"Error SMX condition array is not the same size as the mix dimensions ({lmd} vs {lsmx}). This might be due to a mismatch in genome size."
+        w[:,self._mix_dims] += all_ws[smx_cond, self._mix_dims, :] * smw_tensor + w0[:,self._mix_dims] * (torch.ones_like(smw_tensor, device=self._device) - smw_tensor)
         w = w / 2 + ws_average
 
         torch.manual_seed(random_seed)
@@ -103,8 +111,27 @@ class StyleMixer:
         """Convert the output to an image format."""
         sel = out[0].to(torch.float32)  # 1 x C x W x H -> C x W x H
         img = sel / sel.norm(float('inf'), dim=[1, 2], keepdim=True).clip(1e-8, 1e8)  # Normalize color range.
-        img = (img * 127.5 + 128).clamp(0, 255).to(torch.uint8)  # Standardize to fit RGB range.
         return img
+
+    def generate_w0_X(self, seed: int, class_idx: int) -> tuple[Tensor, Tensor]:
+        """
+        Generate w0 vector and corresponding image.
+
+        :param seed: The seed to generate.
+        :param class_idx: The label.
+        :returns: The image and w vector.
+        """
+        self._z_generator.manual_seed(seed)
+
+        z = torch.randn(size=[1, self._generator.z_dim], device=self._device, generator=self._z_generator)  # Generate latent vector for X
+        label = torch.zeros(size=[1, self._generator.c_dim], device=self._device)
+        w = self._generator.mapping(z=z, c=label, truncation_psi=1, truncation_cutoff=0) - self._generator.mapping.w_avg
+        label[:, class_idx] = 1
+
+        X = self._generator(z, label, noise_mode="random")
+        return X, w
+
+
 
     # ------------------ Copied from https://github.com/NVlabs/stylegan3/blob/main/viz/renderer.py -----------------------
     def _get_pinned_buf(self, ref):

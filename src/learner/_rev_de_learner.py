@@ -48,8 +48,9 @@ class RevDELearner(Learner):
         self.CR = cr # The crossover rate.
         self._continuous = continuous
 
-        self._x_current= x0
+        self._x_current= x0  # pop_size x genome size
         self._fitness = np.empty(shape=x0.shape, dtype=float)
+        self._best_candidate = (None, self._best_fitness)
 
     def new_population(self, fitnesses: NDArray) -> None:
         """
@@ -77,8 +78,6 @@ class RevDELearner(Learner):
     def _recombination(self, x: NDArray) -> NDArray:
         """
         Recombination method of genetic material.
-
-        This approach discretizes the values since our genome is in N.
 
         :param x: The population to do recombination with.
         :return: The recombined population.

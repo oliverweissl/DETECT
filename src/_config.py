@@ -6,15 +6,16 @@ from .learner import Learner
 @dataclass
 class Config:
     """A simple Dataclass to store experiment configs."""
-    generations: int
-    population_size: int
-    continuous_search: bool
-    mix_dim_range: tuple[int, int]
-    predictor: str
-    generator: str
-    genome_size: int = field(init=False)
-    learner: Type[Learner]
+    samples_per_class: int  # How candidates should be searched for per class
+    generations: int  # How many generations we search for candidates.
+    population_size: int  # The size of candidate populations.
+    continuous_search: bool  # Whether the search algorithm outputs continuous or discrete weights.
+    mix_dim_range: tuple[int, int]  # The range of mixing dimensions used.
+    predictor: str  # The predictor network.
+    generator: str  # The generator network.
+    genome_size: int = field(init=False)  # The size of the genome.
+    learner: Type[Learner]  # The learner type.
 
     def __post_init__(self) -> None:
-        self.genome_size = self.mix_dim_range[1]-self.mix_dim_range[0]
+        self.genome_size = self.mix_dim_range[1]-self.mix_dim_range[0]  # Calculate genome size from range of mixing.
 
