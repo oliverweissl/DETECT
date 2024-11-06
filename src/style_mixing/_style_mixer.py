@@ -1,5 +1,3 @@
-import logging
-
 import torch
 import numpy as np
 from torch import Tensor
@@ -113,7 +111,7 @@ class StyleMixer:
         img = sel / sel.norm(float('inf'), dim=[1, 2], keepdim=True).clip(1e-8, 1e8)  # Normalize color range.
         return img
 
-    def generate_w0_X(self, seed: int, class_idx: int) -> tuple[Tensor, Tensor]:
+    def generate_X_w0(self, seed: int, class_idx: int) -> tuple[Tensor, Tensor]:
         """
         Generate w0 vector and corresponding image.
 

@@ -2,7 +2,6 @@ from abc import abstractmethod, ABC
 from numpy.typing import NDArray
 from typing import Union
 import numpy as np
-import logging
 
 
 class Learner(ABC):

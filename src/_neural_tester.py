@@ -1,5 +1,6 @@
 import torch
 import logging
+import wandb
 import numpy as np
 from torch import nn
 from torch import Tensor
@@ -76,28 +77,39 @@ class NeuralTester:
         """
 
         logging.info(f"Start testing. Number of classes: {num_classes}, iterations per class: {samples_per_class}, total iterations: {num_classes*samples_per_class}\n")
+        exp_start = datetime.now()
         for class_idx, sample_id in product(range(num_classes), range(samples_per_class)):
-            first = None
-            while_counter =  0  # For logging purposes to see how many samples we need to find valid seed.
+            self._init_wandb(exp_start, class_idx)  # Initialize Wandb run for logging
+
             w0_tensors: list[Tensor] = []
             logging.info(f"Generate seed(s) for class: {class_idx}.")
+            while_counter = 0  # For logging purposes to see how many samples we need to find valid seed.
             while len(w0_tensors) < self._num_w0:  # Generate base seeds.
                 while_counter += 1
-                X, w = self._mixer.generate_w0_X(self._get_time_seed(), class_idx)
+                img, w = self._mixer.generate_X_w0(self._get_time_seed(), class_idx)  # We generate w0 vector and the corresponding image X.
+                img_rgb = self._assure_rgb(img)  # We transform the image to RGB if it is in Grayscale.
 
-                X_rgb = self._assure_rgb(X)
-                y_hat = self._predictor(X_rgb)
+                y_hat = self._predictor(img_rgb)
+                """
+                Now we select primary and secondary predictions for further style mixing.
+                
+                Note this can be extended to any n predictions, but for this approach we limited it to 2.
+                """
                 first, second, *_ = torch.argsort(y_hat, descending=True)[0]
                 if first.item() == class_idx:  # We are only interested in checking the boundary if the prediction matches the label
                     w0_tensors.append(w)
+
+            # Logging Operations
             logging.info(f"\tFound {self._num_w0} valid seed(s) after: {while_counter} iterations.")
+            wandb.log({"base_image": wandb.Image(img_rgb, caption="Base Image")})
+            wandb.summary["w0_trials"] = while_counter
 
             """
             We generate w0 and w candidates for seed generation.
             
-            Not that these do not have to share a label, but for this implementation we do not control the labels seperately.
+            Not that the w0s and ws' do not have to share a label, but for this implementation we do not control the labels seperately.
             """
-            w0c = [MixCandidate(label=first.item(), is_w0=True, w_tensor=tensor) for tensor in w0_tensors]
+            w0c = [MixCandidate(label=first.item(), is_w0=True, w_tensor=tensor) for tensor in w0_tensors]  # To save compute we parse tha cached tensors of w0 vectors as we generated them already for getting the initial prediction.
             wsc = [MixCandidate(label=second.item()) for _ in range(self._num_ws)]
             candidates = CandidateList(*w0c, *wsc)
 
@@ -117,17 +129,48 @@ class NeuralTester:
                     )
                     images.append(mixed_image)
                 images = [self._assure_rgb(img) for img in images]  # Convert images to RGB if they are grayscale
-                images_tensor = torch.stack(images)  # Make list of tensors into batch
 
                 """We predict the label from the mixed images."""
-                predictions: Tensor = self._predictor(images_tensor)
-                predictions_labels = torch.argsort(predictions, dim=1, descending=True)[:,0].flatten()
+                predictions: Tensor = self._predictor(torch.stack(images))
+                predictions_labels = torch.argsort(predictions, dim=1, descending=True)[:,0].flatten()  # We extract the predicted labels
 
-                fitness = np.array([self._objective_function(X.squeeze(0), Xp, class_idx, yp) for Xp, yp in zip(images, predictions_labels)])
+                fitness = np.array([self._objective_function(img_rgb.squeeze(0), Xp, class_idx, yp) for Xp, yp in zip(images, predictions_labels)])
+
+                # Logging Operations
+                wandb.log(
+                    {
+                        "min_fitness":  fitness.min(),
+                        "max_fitness": fitness.max(),
+                        "mean_fitness": fitness.mean(),
+                        "std_fitness": fitness.std(),
+                    }
+                )
+                if fitness.min() < self._learner.best_candidate[1]:
+                    best_candidate_image = images[np.argmin(fitness)]
+
                 self._learner.new_population(fitness)  # Generate a new population based on previous performance
+
             logging.info(f"\tBest candidate has a fitness of: {self._learner.best_candidate[1]}")
+            wandb.summary["best_fitness"] = self._learner.best_candidate[1]
+            wandb.summary["best_config"] = self._learner.best_candidate[0]
+            wandb.log({"candidate_image": wandb.Image(best_candidate_image, caption="Best candidate image")})
             self._learner.reset()  # Reset the learner for new candidate.
             logging.info("\tReset learner!")
+
+    def _init_wandb(self, exp_start: datetime, class_idx: int) -> None:
+        """Initialize Wandb Run for logging"""
+        wandb.init(
+            project="NeuralStyleSearch",
+            config={
+                "num_gen": self._num_generations,
+                "num_w0s": self._num_w0,
+                "num_wns": self._num_ws,
+                "mix_dims": self._mixer._mix_dims,
+                "pop_size": self._learner._x_current.shape[0],
+                "experiment_start": exp_start,
+                "label": class_idx,
+            }
+        )
 
     @staticmethod
     def _get_time_seed() -> int:
@@ -144,6 +187,3 @@ class NeuralTester:
             return image.repeat(3,1,1)
         elif len(image.shape) == 2:
             return torch.unsqueeze(image, 0).repeat(3,1,1)
-
-
-

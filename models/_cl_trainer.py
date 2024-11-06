@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Type
 from datetime import datetime
 from tqdm import tqdm
+import logging
 from src.objective_functions import get_accuracy
 
 @dataclass
@@ -105,7 +106,7 @@ class ClTrainer:
         for _ in tqdm(range(self._config.epochs)):
             self._train_epoch()
             self._val_epoch()
-        print(f"Finished Training in {datetime.now()-start}!")
+        logging.info(f"Finished Training in {datetime.now()-start}!")
         self._is_trained = True
 
     def show_samples(self, size: int = 4) -> None:
@@ -155,9 +156,21 @@ class ClTrainer:
             tacc += acc
             tloss += loss.item()
             if self._log_inner:
-                wandb.log({"acc": acc, "loss": loss.item(), "lr": self._scheduler.optimizer.param_groups[0]['lr']})
+                wandb.log(
+                    {
+                        "acc": acc,
+                        "loss": loss.item(),
+                        "lr": self._scheduler.optimizer.param_groups[0]['lr'],
+                    }
+                )
         if not self._log_inner:
-            wandb.log({"acc": tacc/len(self._train_loader), "loss": tloss/len(self._train_loader), "lr": self._scheduler.optimizer.param_groups[0]['lr']})
+            wandb.log(
+                {
+                    "acc": tacc/len(self._train_loader),
+                    "loss": tloss/len(self._train_loader),
+                    "lr": self._scheduler.optimizer.param_groups[0]['lr'],
+                }
+            )
 
 
     def _val_epoch(self) -> None:
@@ -172,6 +185,16 @@ class ClTrainer:
                 tacc += acc
                 tloss += (loss := self._criterion(pred, y).item())
                 if self._log_inner:
-                    wandb.log({"val_acc": acc, "val_loss": loss})
+                    wandb.log(
+                        {
+                            "val_acc": acc,
+                            "val_loss": loss,
+                        }
+                    )
             if not self._log_inner:
-                wandb.log({"val_acc": tacc/len(self._val_loader), "val_loss": tloss/len(self._val_loader)})
+                wandb.log(
+                    {
+                        "val_acc": tacc/len(self._val_loader),
+                        "val_loss": tloss/len(self._val_loader),
+                    }
+                )

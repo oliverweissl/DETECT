@@ -1,4 +1,4 @@
-"""A collection of objective functions."""
+"""A collection of functions to evaluate."""
 
 from ._w1_distance import get_w1_distance
 from ._accuracy import get_accuracy
