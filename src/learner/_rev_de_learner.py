@@ -20,9 +20,7 @@ class RevDELearner(Learner):
     _continuous: bool
 
     # Population stuff
-    _x_previous: NDArray
     _x_current_continuous: NDArray
-    _fitness_current: NDArray
 
     def __init__(
         self,
@@ -43,8 +41,6 @@ class RevDELearner(Learner):
         :param cr: The crossover rate.
         :param continuous: If genomes are continuous or not.
         """
-        self._generation = 0
-        self._best_fitness = np.inf
         self._population_size = population_size
 
         self._bounds = bounds  # The bounds of genome values.
@@ -53,23 +49,12 @@ class RevDELearner(Learner):
         self._continuous = continuous
 
         self._x_current = x0  # pop_size x genome size
-        self._fitness = np.empty(shape=x0.shape, dtype=float)
-        self._best_candidate = (None, self._best_fitness)
+        self._best_candidate = (None, np.inf)
 
-    def new_population(self, fitnesses: NDArray) -> None:
-        """
-        Generate a new population based on fitnesses of current population.
-
-        :param fitnesses: The evaluated fitnesses.
-        """
-        x, f = self._select(self._x_current, fitnesses)
-        x_cand, f_min = x[np.argmin(f)], np.min(f)
-        self._best_candidate = (
-            (x_cand, f_min) if f_min < self._best_candidate[1] else self._best_candidate
-        )
-
+    def new_population(self) -> None:
+        """Generate a new population based on fitnesses of current population."""
+        x, f = self._select(self._x_current, self._fitness)
         self._x_current = self._recombination(x)
-        self._fitness = f
 
     def get_x_current(self) -> tuple[Union[NDArray, None], NDArray]:
         """

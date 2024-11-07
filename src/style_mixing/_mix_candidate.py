@@ -70,17 +70,13 @@ class CandidateList(UserList):
     @property
     def w0_candidates(self) -> CandidateList:
         if not self._w0_candidates:
-            self._w0_candidates = CandidateList(
-                *[elem for elem in self.data if elem.is_w0]
-            )
+            self._w0_candidates = CandidateList(*[elem for elem in self.data if elem.is_w0])
         return self._w0_candidates
 
     @property
     def wn_candidates(self) -> CandidateList:
         if not self._wn_candidates:
-            self._wn_candidates = CandidateList(
-                *[elem for elem in self.data if not elem.is_w0]
-            )
+            self._wn_candidates = CandidateList(*[elem for elem in self.data if not elem.is_w0])
         return self._wn_candidates
 
     """Make the list immutable."""

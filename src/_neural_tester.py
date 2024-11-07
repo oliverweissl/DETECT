@@ -5,6 +5,7 @@ from typing import Callable
 
 import numpy as np
 import torch
+from numpy.typing import NDArray
 from torch import Tensor, nn
 
 import wandb
@@ -83,22 +84,20 @@ class NeuralTester:
             f"Start testing. Number of classes: {num_classes}, iterations per class: {samples_per_class}, total iterations: {num_classes*samples_per_class}\n"
         )
         exp_start = datetime.now()
-        for class_idx, sample_id in product(
-            range(num_classes), range(samples_per_class)
-        ):
+        for class_idx, sample_id in product(range(num_classes), range(samples_per_class)):
             self._init_wandb(exp_start, class_idx)  # Initialize Wandb run for logging
 
             w0_tensors: list[Tensor] = []
             logging.info(f"Generate seed(s) for class: {class_idx}.")
-            while_counter = 0  # For logging purposes to see how many samples we need to find valid seed.
+            while_counter = (
+                0  # For logging purposes to see how many samples we need to find valid seed.
+            )
             while len(w0_tensors) < self._num_w0:  # Generate base seeds.
                 while_counter += 1
-                img, w = self._mixer.generate_X_w0(
-                    self._get_time_seed(), class_idx
-                )  # We generate w0 vector and the corresponding image X.
-                img_rgb = self._assure_rgb(
-                    img
-                )  # We transform the image to RGB if it is in Grayscale.
+                # We generate w0 vector and the corresponding image X.
+                img, w = self._mixer.generate_X_w0(self._get_time_seed(), class_idx)
+                # We transform the image to RGB if it is in Grayscale.
+                img_rgb = self._assure_rgb(img)
 
                 y_hat = self._predictor(img_rgb)
                 """
@@ -107,15 +106,12 @@ class NeuralTester:
                 Note this can be extended to any n predictions, but for this approach we limited it to 2.
                 """
                 first, second, *_ = torch.argsort(y_hat, descending=True)[0]
-                if (
-                    first.item() == class_idx
-                ):  # We are only interested in checking the boundary if the prediction matches the label
+                # We are only interested in checking the boundary if the prediction matches the label
+                if first.item() == class_idx:
                     w0_tensors.append(w)
 
             # Logging Operations
-            logging.info(
-                f"\tFound {self._num_w0} valid seed(s) after: {while_counter} iterations."
-            )
+            logging.info(f"\tFound {self._num_w0} valid seed(s) after: {while_counter} iterations.")
             wandb.log({"base_image": wandb.Image(img_rgb, caption="Base Image")})
             wandb.summary["w0_trials"] = while_counter
 
@@ -124,71 +120,36 @@ class NeuralTester:
             
             Not that the w0s and ws' do not have to share a label, but for this implementation we do not control the labels seperately.
             """
+            # To save compute we parse tha cached tensors of w0 vectors as we generated them already for getting the initial prediction.
             w0c = [
                 MixCandidate(label=first.item(), is_w0=True, w_tensor=tensor)
                 for tensor in w0_tensors
-            ]  # To save compute we parse tha cached tensors of w0 vectors as we generated them already for getting the initial prediction.
+            ]
             wsc = [MixCandidate(label=second.item()) for _ in range(self._num_ws)]
             candidates = CandidateList(*w0c, *wsc)
 
             # Now we run a search-based optimization strategy to find a good boundary candidate.
-            logging.info(
-                f"Running Search-Algorithm for {self._num_generations} generations."
-            )
+            logging.info(f"Running Search-Algorithm for {self._num_generations} generations.")
+
+            # We define the inner loop with its parameters.
+            run_inner_loop = lambda: self._inner_loop(len(wsc), candidates, img_rgb, class_idx)
             for _ in range(self._num_generations):
-                smx_cond_arr, smx_weights_arr = (
-                    self._learner.get_x_current()
-                )  # Get the initial population of style mixing conditions and weights
-                assert (
-                    0 <= smx_cond_arr.max() < len(wsc)
-                ), f"Error: StyleMixing Conditions reference indices of {smx_cond_arr.max()}, but we only have {len(wsc)} elements."
-
-                images = []
-                for smx_cond, smx_weights in zip(smx_cond_arr, smx_weights_arr):
-                    mixed_image = self._mixer.mix(
-                        candidates=candidates,
-                        smx_cond=smx_cond,
-                        smx_weights=smx_weights,
-                        random_seed=self._get_time_seed(),
-                    )
-                    images.append(mixed_image)
-                images = [
-                    self._assure_rgb(img) for img in images
-                ]  # Convert images to RGB if they are grayscale
-
-                """We predict the label from the mixed images."""
-                predictions: Tensor = self._predictor(torch.stack(images))
-                predictions_labels = torch.argsort(predictions, dim=1, descending=True)[
-                    :, 0
-                ].flatten()  # We extract the predicted labels
-
-                fitness = np.array(
-                    [
-                        self._objective_function(img_rgb.squeeze(0), Xp, class_idx, yp)
-                        for Xp, yp in zip(images, predictions_labels)
-                    ]
-                )
-
-                # Logging Operations
-                wandb.log(
-                    {
-                        "min_fitness": fitness.min(),
-                        "max_fitness": fitness.max(),
-                        "mean_fitness": fitness.mean(),
-                        "std_fitness": fitness.std(),
-                    }
-                )
-                if fitness.min() < self._learner.best_candidate[1]:
+                images, fitness, p_labels = run_inner_loop()
+                # Assign fitness to current population.
+                self._learner.assign_fitness(fitness)
+                if fitness.min() <= self._learner.best_candidate[1]:
+                    candidate_prediction = p_labels[np.argmin(fitness)]
                     best_candidate_image = images[np.argmin(fitness)]
-                    candidate_prediction = predictions_labels[np.argmin(fitness)]
+                # Generate a new population based on previous performance.
+                self._learner.new_population()
+            else:
+                images, fitness, p_labels = run_inner_loop()
+                self._learner.assign_fitness(fitness)
+                if fitness.min() <= self._learner.best_candidate[1]:
+                    candidate_prediction = p_labels[np.argmin(fitness)]
+                    best_candidate_image = images[np.argmin(fitness)]
 
-                self._learner.new_population(
-                    fitness
-                )  # Generate a new population based on previous performance
-
-            logging.info(
-                f"\tBest candidate has a fitness of: {self._learner.best_candidate[1]}"
-            )
+            logging.info(f"\tBest candidate has a fitness of: {self._learner.best_candidate[1]}")
             wandb.summary["best_fitness"] = self._learner.best_candidate[1]
             wandb.summary["boundary_to"] = candidate_prediction
             wandb.log(
@@ -204,6 +165,60 @@ class NeuralTester:
             )
             self._learner.reset()  # Reset the learner for new candidate.
             logging.info("\tReset learner!")
+
+    def _inner_loop(
+        self, num_wn_candidates: int, candidates: CandidateList, X: Tensor, y: int
+    ) -> tuple[list[Tensor], NDArray, Tensor]:
+        """
+        The inner loop for the learner.
+
+        :param num_wn_candidates: The number of mixing candidates.
+        :param candidates: The mixing candidates to be used.
+        :param X: The base image tensor.
+        :param y: The base class label.
+        :returns: The images generated, the corresponding fitness and predicted labels.
+        """
+        # Get the initial population of style mixing conditions and weights
+        smx_cond_arr, smx_weights_arr = self._learner.get_x_current()
+        assert (
+            0 <= smx_cond_arr.max() < num_wn_candidates
+        ), f"Error: StyleMixing Conditions reference indices of {smx_cond_arr.max()}, but we only have {len(wsc)} elements."
+
+        images = []
+        for smx_cond, smx_weights in zip(smx_cond_arr, smx_weights_arr):
+            mixed_image = self._mixer.mix(
+                candidates=candidates,
+                smx_cond=smx_cond,
+                smx_weights=smx_weights,
+                random_seed=self._get_time_seed(),
+            )
+            images.append(mixed_image)
+        # Convert images to RGB if they are grayscale
+        images = [self._assure_rgb(img) for img in images]
+
+        """We predict the label from the mixed images."""
+        predictions: Tensor = self._predictor(torch.stack(images))
+        # Extract the predicted labels
+        predictions_labels = torch.argsort(predictions, dim=1, descending=True)[:, 0].flatten()
+
+        fitness = np.array(
+            [
+                self._objective_function(X.squeeze(0), Xp, y, yp)
+                for Xp, yp in zip(images, predictions_labels)
+            ]
+        )
+
+        # Logging Operations
+        wandb.log(
+            {
+                "min_fitness": fitness.min(),
+                "max_fitness": fitness.max(),
+                "mean_fitness": fitness.mean(),
+                "std_fitness": fitness.std(),
+            }
+        )
+
+        return images, fitness, predictions_labels
 
     def _init_wandb(self, exp_start: datetime, class_idx: int) -> None:
         """
@@ -222,7 +237,7 @@ class NeuralTester:
                 "pop_size": self._learner._x_current.shape[0],
                 "experiment_start": exp_start,
                 "label": class_idx,
-                "learner_type": type(self._learner),
+                "tags": self._learner.__class__.__name__,
             },
         )
 

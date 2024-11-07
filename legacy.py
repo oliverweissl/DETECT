@@ -213,9 +213,7 @@ def convert_tf_generator(tf_G):
         r"synthesis\.b4\.conv1\.affine\.bias",
         lambda: tf_params[f"synthesis/4x4/Conv/mod_bias"] + 1,
         r"synthesis\.b(\d+)\.conv0\.weight",
-        lambda r: tf_params[f"synthesis/{r}x{r}/Conv0_up/weight"][::-1, ::-1].transpose(
-            3, 2, 0, 1
-        ),
+        lambda r: tf_params[f"synthesis/{r}x{r}/Conv0_up/weight"][::-1, ::-1].transpose(3, 2, 0, 1),
         r"synthesis\.b(\d+)\.conv0\.bias",
         lambda r: tf_params[f"synthesis/{r}x{r}/Conv0_up/bias"],
         r"synthesis\.b(\d+)\.conv0\.noise_const",
@@ -247,9 +245,7 @@ def convert_tf_generator(tf_G):
         r"synthesis\.b(\d+)\.torgb\.affine\.bias",
         lambda r: tf_params[f"synthesis/{r}x{r}/ToRGB/mod_bias"] + 1,
         r"synthesis\.b(\d+)\.skip\.weight",
-        lambda r: tf_params[f"synthesis/{r}x{r}/Skip/weight"][::-1, ::-1].transpose(
-            3, 2, 0, 1
-        ),
+        lambda r: tf_params[f"synthesis/{r}x{r}/Skip/weight"][::-1, ::-1].transpose(3, 2, 0, 1),
         r".*\.resample_filter",
         None,
         r".*\.act_filter",
@@ -333,9 +329,9 @@ def convert_tf_discriminator(tf_D):
         r"b(\d+)\.fromrgb\.bias",
         lambda r: tf_params[f"{r}x{r}/FromRGB/bias"],
         r"b(\d+)\.conv(\d+)\.weight",
-        lambda r, i: tf_params[
-            f'{r}x{r}/Conv{i}{["","_down"][int(i)]}/weight'
-        ].transpose(3, 2, 0, 1),
+        lambda r, i: tf_params[f'{r}x{r}/Conv{i}{["","_down"][int(i)]}/weight'].transpose(
+            3, 2, 0, 1
+        ),
         r"b(\d+)\.conv(\d+)\.bias",
         lambda r, i: tf_params[f'{r}x{r}/Conv{i}{["","_down"][int(i)]}/bias'],
         r"b(\d+)\.skip\.weight",

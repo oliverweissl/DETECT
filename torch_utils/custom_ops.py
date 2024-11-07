@@ -145,8 +145,7 @@ def get_plugin(module_name, sources, headers=None, source_dir=None, **build_kwar
 
             # Compile.
             cached_sources = [
-                os.path.join(cached_build_dir, os.path.basename(fname))
-                for fname in sources
+                os.path.join(cached_build_dir, os.path.basename(fname)) for fname in sources
             ]
             torch.utils.cpp_extension.load(
                 name=module_name,

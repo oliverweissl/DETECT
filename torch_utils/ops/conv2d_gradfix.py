@@ -123,9 +123,7 @@ _conv2d_gradfix_cache = dict()
 _null_tensor = torch.empty([0])
 
 
-def _conv2d_gradfix(
-    transpose, weight_shape, stride, padding, output_padding, dilation, groups
-):
+def _conv2d_gradfix(transpose, weight_shape, stride, padding, output_padding, dilation, groups):
     # Parse arguments.
     ndim = 2
     weight_shape = tuple(weight_shape)
@@ -148,14 +146,10 @@ def _conv2d_gradfix(
     if not transpose:
         assert all(output_padding[i] == 0 for i in range(ndim))
     else:  # transpose
-        assert all(
-            0 <= output_padding[i] < max(stride[i], dilation[i]) for i in range(ndim)
-        )
+        assert all(0 <= output_padding[i] < max(stride[i], dilation[i]) for i in range(ndim))
 
     # Helpers.
-    common_kwargs = dict(
-        stride=stride, padding=padding, dilation=dilation, groups=groups
-    )
+    common_kwargs = dict(stride=stride, padding=padding, dilation=dilation, groups=groups)
 
     def calc_output_padding(input_shape, output_shape):
         if transpose:
@@ -187,20 +181,12 @@ def _conv2d_gradfix(
             ):
                 a = weight.reshape(groups, weight_shape[0] // groups, weight_shape[1])
                 b = input.reshape(input.shape[0], groups, input.shape[1] // groups, -1)
-                c = (a.transpose(1, 2) if transpose else a) @ b.permute(
-                    1, 2, 0, 3
-                ).flatten(2)
+                c = (a.transpose(1, 2) if transpose else a) @ b.permute(1, 2, 0, 3).flatten(2)
                 c = c.reshape(-1, input.shape[0], *input.shape[2:]).transpose(0, 1)
-                c = (
-                    c
-                    if bias is None
-                    else c + bias.unsqueeze(0).unsqueeze(2).unsqueeze(3)
-                )
+                c = c if bias is None else c + bias.unsqueeze(0).unsqueeze(2).unsqueeze(3)
                 return c.contiguous(
                     memory_format=(
-                        torch.channels_last
-                        if input.stride(1) == 1
-                        else torch.contiguous_format
+                        torch.channels_last if input.stride(1) == 1 else torch.contiguous_format
                     )
                 )
 
@@ -226,9 +212,7 @@ def _conv2d_gradfix(
             grad_bias = None
 
             if ctx.needs_input_grad[0]:
-                p = calc_output_padding(
-                    input_shape=input_shape, output_shape=grad_output.shape
-                )
+                p = calc_output_padding(input_shape=input_shape, output_shape=grad_output.shape)
                 op = _conv2d_gradfix(
                     transpose=(not transpose),
                     weight_shape=weight_shape,
@@ -272,14 +256,12 @@ def _conv2d_gradfix(
                     .permute(1, 2, 0, 3)
                     .flatten(2)
                 )
-                c = (
-                    b @ a.transpose(1, 2) if transpose else a @ b.transpose(1, 2)
-                ).reshape(weight_shape)
+                c = (b @ a.transpose(1, 2) if transpose else a @ b.transpose(1, 2)).reshape(
+                    weight_shape
+                )
                 return c.contiguous(
                     memory_format=(
-                        torch.channels_last
-                        if input.stride(1) == 1
-                        else torch.contiguous_format
+                        torch.channels_last if input.stride(1) == 1 else torch.contiguous_format
                     )
                 )
 
@@ -295,14 +277,7 @@ def _conv2d_gradfix(
                 torch.backends.cudnn.allow_tf32,
             ]
             return torch._C._jit_get_operation(name)(
-                weight_shape,
-                grad_output,
-                input,
-                padding,
-                stride,
-                dilation,
-                groups,
-                *flags
+                weight_shape, grad_output, input, padding, stride, dilation, groups, *flags
             )
 
         @staticmethod
@@ -318,9 +293,7 @@ def _conv2d_gradfix(
                 assert grad2_grad_output.shape == grad_output_shape
 
             if ctx.needs_input_grad[1]:
-                p = calc_output_padding(
-                    input_shape=input_shape, output_shape=grad_output_shape
-                )
+                p = calc_output_padding(input_shape=input_shape, output_shape=grad_output_shape)
                 op = _conv2d_gradfix(
                     transpose=(not transpose),
                     weight_shape=weight_shape,

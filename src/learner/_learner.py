@@ -11,15 +11,26 @@ class Learner(ABC):
     # Standard elements.
     _best_candidate: tuple[Union[NDArray, None], float]
     _x_current: NDArray
+    _fitness: NDArray
 
     @abstractmethod
-    def new_population(self, fitnesses: NDArray) -> None:
+    def new_population(self) -> None:
         """
-        Generate a new population based on fitnesses of current population.
-
-        :param fitnesses: The evaluated fitnesses.
+        Generate a new population.
         """
         ...
+
+    def assign_fitness(self, fitness: NDArray) -> None:
+        """
+        Assign fitness to the current population and extract the best individual if it beats champion.
+
+        :param fitness: The fitness to assign.
+        """
+        self._fitness = fitness
+        x_cand, f_min = self._x_current[np.argmin(fitness)], np.min(fitness)
+        self._best_candidate = (
+            (x_cand, f_min) if f_min < self._best_candidate[1] else self._best_candidate
+        )
 
     @abstractmethod
     def get_x_current(self) -> tuple[Union[NDArray, None], NDArray]:

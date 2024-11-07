@@ -68,9 +68,7 @@ class StyleMixer:
         :param noise_mode: The noise to use for style generation (const, random).
         :returns: The generated image (C x H x W) as float with range [0, 1].
         """
-        assert len(smx_cond) == len(
-            smx_weights
-        ), "Error: The parameters have to be of same length."
+        assert len(smx_cond) == len(smx_weights), "Error: The parameters have to be of same length."
 
         if self._has_input_transform:
             m = np.eye(3)
@@ -96,9 +94,7 @@ class StyleMixer:
 
         ws_average = self._generator.mapping.w_avg
         all_ws = (
-            self._generator.mapping(
-                z=all_zs, c=all_cs, truncation_psi=1, truncation_cutoff=0
-            )
+            self._generator.mapping(z=all_zs, c=all_cs, truncation_psi=1, truncation_cutoff=0)
             - ws_average
         )
 
@@ -107,16 +103,12 @@ class StyleMixer:
             candidates.w0_candidates.weights,
             candidates.w0_candidates.w_tensors,
         )
-        assert (
-            sum(w0_weights) == 1
-        ), f"Error: w0 weight do not sum up to one: {w0_weights}."
+        assert sum(w0_weights) == 1, f"Error: w0 weight do not sum up to one: {w0_weights}."
         weight_tensor = torch.as_tensor(w0_weights, device=self._device)[:, None, None]
         w0_tensors = torch.stack(w0_tensors) - ws_average
 
         w0 = (w0_tensors * weight_tensor).sum(dim=0)  # Initialize base using w0 seeds.
-        w = torch.zeros_like(
-            w0, device=self._device, dtype=torch.float32
-        )  # Empty w vector
+        w = torch.zeros_like(w0, device=self._device, dtype=torch.float32)  # Empty w vector
         """
         Here we do style mixing.
 
@@ -125,9 +117,7 @@ class StyleMixer:
         Here we convert the indices to condition such that we know which w to take for each layer (If only one candidate this is array of equal integers).
         """
         # wn_w_cond = [candidates.wn_candidates.w_indices[cond] for cond in smx_cond]
-        smw_tensor = torch.as_tensor(smx_weights, device=self._device)[
-            :, None
-        ]  # |_mix_dims| x 1
+        smw_tensor = torch.as_tensor(smx_weights, device=self._device)[:, None]  # |_mix_dims| x 1
         assert (lmd := len(self._mix_dims)) == (
             lsmx := len(smx_cond)
         ), f"Error SMX condition array is not the same size as the mix dimensions ({lmd} vs {lsmx}). This might be due to a mismatch in genome size."
@@ -194,9 +184,7 @@ class StyleMixer:
         def module_hook(module, _inputs, outputs):
             outputs = list(outputs) if isinstance(outputs, (tuple, list)) else [outputs]
             outputs = [
-                out
-                for out in outputs
-                if isinstance(out, torch.Tensor) and out.ndim in [4, 5]
+                out for out in outputs if isinstance(out, torch.Tensor) and out.ndim in [4, 5]
             ]
             for idx, out in enumerate(outputs):
                 if out.ndim == 5:  # G-CNN => remove group dimension.
@@ -263,9 +251,7 @@ class StyleMixer:
         return z, m
 
 
-def _construct_affine_bandlimit_filter(
-    mat, a=3, amax=16, aflt=64, up=4, cutoff_in=1, cutoff_out=1
-):
+def _construct_affine_bandlimit_filter(mat, a=3, amax=16, aflt=64, up=4, cutoff_in=1, cutoff_out=1):
     assert a <= amax < aflt
     mat = torch.as_tensor(mat).to(torch.float32)
 

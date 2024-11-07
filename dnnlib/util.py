@@ -56,9 +56,7 @@ class EasyDict(dict):
 class Logger(object):
     """Redirect stderr to stdout, optionally print stdout to a file, and optionally force flushing on both stdout and the file."""
 
-    def __init__(
-        self, file_name: str = None, file_mode: str = "w", should_flush: bool = True
-    ):
+    def __init__(self, file_name: str = None, file_mode: str = "w", should_flush: bool = True):
         self.file = None
 
         if file_name is not None:
@@ -253,9 +251,7 @@ def get_module_from_obj_name(obj_name: str) -> Tuple[types.ModuleType, str]:
 
     # list alternatives for (module_name, local_obj_name)
     parts = obj_name.split(".")
-    name_pairs = [
-        (".".join(parts[:i]), ".".join(parts[i:])) for i in range(len(parts), 0, -1)
-    ]
+    name_pairs = [(".".join(parts[:i]), ".".join(parts[i:])) for i in range(len(parts), 0, -1)]
 
     # try each alternative in turn
     for module_name, local_obj_name in name_pairs:
@@ -271,9 +267,7 @@ def get_module_from_obj_name(obj_name: str) -> Tuple[types.ModuleType, str]:
         try:
             importlib.import_module(module_name)  # may raise ImportError
         except ImportError:
-            if not str(sys.exc_info()[1]).startswith(
-                "No module named '" + module_name + "'"
-            ):
+            if not str(sys.exc_info()[1]).startswith("No module named '" + module_name + "'"):
                 raise
 
     # maybe the requested attribute is missing?

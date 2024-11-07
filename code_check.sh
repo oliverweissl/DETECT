@@ -1,5 +1,5 @@
 #!/bin/bash
-python -m black .
+python -m black . --line-length 100 --preview
 
 arr=("models" "src")
 for elem in "${arr[@]}"

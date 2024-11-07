@@ -19,9 +19,7 @@ class GeneticLearner(Learner):
     def _mutate(x: int, p: float, mr: float) -> int:
         return 1 - x if p < mr else x
 
-    def __init__(
-        self, x0: NDArray, population_size: int, mutation_rate: float = 0.05
-    ) -> None:
+    def __init__(self, x0: NDArray, population_size: int, mutation_rate: float = 0.05) -> None:
         """
         Initialize the genetic learner.
 
@@ -34,51 +32,50 @@ class GeneticLearner(Learner):
         self._mutation_rate = mutation_rate
 
         self._vec_mutate = np.vectorize(self._mutate)
+        self._best_candidate = (None, np.inf)
 
-    def new_population(self, fitnesses: NDArray) -> None:
-        """
-        Generate a new population based on fitness of old population.
+    def new_population(self) -> None:
+        """Generate a new population based on fitness of old population."""
+        parents = self._tournament_selection()
 
-        :param fitnesses: The fitness of old population.
-        """
-        parents = self._tournament_selection(
-            self._x_current, fitnesses, self._population_size
+        # Generate parent pairs. If the number of parents is not divisible by two, discard random elements.
+        all_indices = np.random.choice(
+            np.arange(self._population_size), self._population_size, replace=False
         )
-        indices = np.vstack(
-            np.split(np.random.choice(self._population_size, replace=False), 2)
+        parent_indices = np.stack(
+            np.split(all_indices[: (self._population_size // 2) * 2], 2), axis=-1
         )
-        probabilities = np.random.rand(len(indices))
+
+        # Generate new individuals from parent pairs.
         new_individuals = np.array(
-            [self._crossover(parents[a], parents[b]) for a, b in indices]
+            [self._crossover(parents[a], parents[b]) for a, b in parent_indices]
         )
-        children = self._vec_mutate(new_individuals, probabilities, self._mutation_rate)
 
-        self._x_current = parents + children
+        # Mutate the new individuals to get the children
+        mutation_probabilities = np.random.rand(parent_indices.shape[0])
+        mutation_array = np.tile(mutation_probabilities[:, None], (1, new_individuals.shape[1]))
+        children = self._vec_mutate(new_individuals, mutation_array, self._mutation_rate)
 
-    @staticmethod
-    def _tournament_selection(
-        population: NDArray, fitnesses: NDArray, to_keep: int, k: int = 2
-    ) -> NDArray:
+        self._x_current = np.concatenate((parents, children), axis=0)
+
+    def _tournament_selection(self, k: int = 2) -> NDArray:
         """
         Generate a new subset of individuals based on tournament.
 
-
-        :param population: The population
-        :param fitnesses: The fitness of individuals.
-        :param to_keep: The number of individuals to keep.
         :param k: The number of contestants.
         :returns: The new population.
         """
-        all_indices = np.arange(len(population))
+        p, f = self._x_current.copy(), self._fitness.copy()
+        available_indices = np.arange(len(p))
         winners = []
-        for _ in range(to_keep):
-            individuals = np.random.choice(all_indices, size=k, replace=False)
-            winner = np.argmax(fitnesses[individuals])
-            winners.append(population[winner])
+        for _ in range(self._population_size):
+            individuals = np.random.choice(available_indices, size=k, replace=False)
+            winner_index = np.argmin(f[individuals])
+            winners.append(p[individuals[winner_index]])
 
-            all_indices = np.delete(all_indices, winner)
-            population = np.delete(population, winner)
-            fitnesses = np.delete(fitnesses, winner)
+            available_indices = np.delete(
+                available_indices, np.where(available_indices == individuals[winner_index])
+            )
         return np.array(winners)
 
     @staticmethod
@@ -91,7 +88,7 @@ class GeneticLearner(Learner):
         :returns: The new genome.
         """
         assert (l := len(xa)) == len(xb)
-        return np.concatenate(xa[:l], xb[l:])
+        return np.concatenate((xa[:l], xb[l:]))
 
     def get_x_current(self) -> tuple[Union[NDArray, None], NDArray]:
         """
@@ -99,11 +96,6 @@ class GeneticLearner(Learner):
 
         :return: The population as array of smx indices and smx weights.
         """
-        """
-                Return the current population in specific format.
-
-                :return: The population as array of smx conditions and smx weights.
-                """
         smx_cond = np.zeros_like(
             self._x_current
         )  # TODO: for now only one element can be used to mix styles -> should be n elements.

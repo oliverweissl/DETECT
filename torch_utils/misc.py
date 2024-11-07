@@ -66,9 +66,7 @@ except AttributeError:
         if neginf is None:
             neginf = torch.finfo(input.dtype).min
         assert nan == 0
-        return torch.clamp(
-            input.unsqueeze(0).nansum(0), min=neginf, max=posinf, out=out
-        )
+        return torch.clamp(input.unsqueeze(0).nansum(0), min=neginf, max=posinf, out=out)
 
 
 # ----------------------------------------------------------------------------
@@ -119,9 +117,7 @@ def assert_shape(tensor, ref_shape):
                     f"Wrong size for dimension {idx}: expected {ref_size}",
                 )
         elif size != ref_size:
-            raise AssertionError(
-                f"Wrong size for dimension {idx}: got {size}, expected {ref_size}"
-            )
+            raise AssertionError(f"Wrong size for dimension {idx}: got {size}, expected {ref_size}")
 
 
 # ----------------------------------------------------------------------------
@@ -143,9 +139,7 @@ def profiled_function(fn):
 
 
 class InfiniteSampler(torch.utils.data.Sampler):
-    def __init__(
-        self, dataset, rank=0, num_replicas=1, shuffle=True, seed=0, window_size=0.5
-    ):
+    def __init__(self, dataset, rank=0, num_replicas=1, shuffle=True, seed=0, window_size=0.5):
         assert len(dataset) > 0
         assert num_replicas > 0
         assert 0 <= rank < num_replicas
@@ -199,9 +193,7 @@ def copy_params_and_buffers(src_module, dst_module, require_all=False):
     for name, tensor in named_params_and_buffers(dst_module):
         assert (name in src_tensors) or (not require_all)
         if name in src_tensors:
-            tensor.copy_(src_tensors[name].detach()).requires_grad_(
-                tensor.requires_grad
-            )
+            tensor.copy_(src_tensors[name].detach()).requires_grad_(tensor.requires_grad)
 
 
 # ----------------------------------------------------------------------------
@@ -274,9 +266,7 @@ def print_module_summary(module, inputs, max_nesting=3, skip_redundant=True):
         e.unique_params = [t for t in e.mod.parameters() if id(t) not in tensors_seen]
         e.unique_buffers = [t for t in e.mod.buffers() if id(t) not in tensors_seen]
         e.unique_outputs = [t for t in e.outputs if id(t) not in tensors_seen]
-        tensors_seen |= {
-            id(t) for t in e.unique_params + e.unique_buffers + e.unique_outputs
-        }
+        tensors_seen |= {id(t) for t in e.unique_params + e.unique_buffers + e.unique_outputs}
 
     # Filter out redundant entries.
     if skip_redundant:
@@ -287,9 +277,7 @@ def print_module_summary(module, inputs, max_nesting=3, skip_redundant=True):
         ]
 
     # Construct table.
-    rows = [
-        [type(module).__name__, "Parameters", "Buffers", "Output shape", "Datatype"]
-    ]
+    rows = [[type(module).__name__, "Parameters", "Buffers", "Output shape", "Datatype"]]
     rows += [["---"] * len(rows[0])]
     param_total = 0
     buffer_total = 0
@@ -310,9 +298,7 @@ def print_module_summary(module, inputs, max_nesting=3, skip_redundant=True):
             ]
         ]
         for idx in range(1, len(e.outputs)):
-            rows += [
-                [name + f":{idx}", "-", "-", output_shapes[idx], output_dtypes[idx]]
-            ]
+            rows += [[name + f":{idx}", "-", "-", output_shapes[idx], output_dtypes[idx]]]
         param_total += param_size
         buffer_total += buffer_size
     rows += [["---"] * len(rows[0])]
@@ -322,11 +308,7 @@ def print_module_summary(module, inputs, max_nesting=3, skip_redundant=True):
     widths = [max(len(cell) for cell in column) for column in zip(*rows)]
     print()
     for row in rows:
-        print(
-            "  ".join(
-                cell + " " * (width - len(cell)) for cell, width in zip(row, widths)
-            )
-        )
+        print("  ".join(cell + " " * (width - len(cell)) for cell, width in zip(row, widths)))
     print()
     return outputs
 

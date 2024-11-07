@@ -29,9 +29,7 @@ def _get_weight_shape(w):
 # ----------------------------------------------------------------------------
 
 
-def _conv2d_wrapper(
-    x, w, stride=1, padding=0, groups=1, transpose=False, flip_weight=True
-):
+def _conv2d_wrapper(x, w, stride=1, padding=0, groups=1, transpose=False, flip_weight=True):
     """Wrapper for the underlying `conv2d()` and `conv_transpose2d()` implementations."""
     _out_channels, _in_channels_per_group, kh, kw = _get_weight_shape(w)
 
@@ -123,12 +121,8 @@ def conv2d_resample(
 
     # Fast path: downsampling only => use strided convolution.
     if down > 1 and up == 1:
-        x = upfirdn2d.upfirdn2d(
-            x=x, f=f, padding=[px0, px1, py0, py1], flip_filter=flip_filter
-        )
-        x = _conv2d_wrapper(
-            x=x, w=w, stride=down, groups=groups, flip_weight=flip_weight
-        )
+        x = upfirdn2d.upfirdn2d(x=x, f=f, padding=[px0, px1, py0, py1], flip_filter=flip_filter)
+        x = _conv2d_wrapper(x=x, w=w, stride=down, groups=groups, flip_weight=flip_weight)
         return x
 
     # Fast path: upsampling with optional downsampling => use transpose strided convolution.
@@ -138,9 +132,7 @@ def conv2d_resample(
         else:
             w = w.reshape(groups, out_channels // groups, in_channels_per_group, kh, kw)
             w = w.transpose(1, 2)
-            w = w.reshape(
-                groups * in_channels_per_group, out_channels // groups, kh, kw
-            )
+            w = w.reshape(groups * in_channels_per_group, out_channels // groups, kh, kw)
         px0 -= kw - 1
         px1 -= kw - up
         py0 -= kh - 1

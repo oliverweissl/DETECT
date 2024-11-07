@@ -211,9 +211,7 @@ def _filtered_lrelu_ref(
     x = bias_act.bias_act(
         x=x, act="lrelu", alpha=slope, gain=gain, clamp=clamp
     )  # Bias, leaky ReLU, clamp.
-    x = upfirdn2d.upfirdn2d(
-        x=x, f=fd, down=down, flip_filter=flip_filter
-    )  # Downsample.
+    x = upfirdn2d.upfirdn2d(x=x, f=fd, down=down, flip_filter=flip_filter)  # Downsample.
 
     # Check output shape & dtype.
     misc.assert_shape(x, [batch_size, channels, out_h, out_w])
@@ -286,9 +284,7 @@ def _filtered_lrelu_cuda(
 
             # Call C++/Cuda plugin if datatype is supported.
             if x.dtype in [torch.float16, torch.float32]:
-                if torch.cuda.current_stream(x.device) != torch.cuda.default_stream(
-                    x.device
-                ):
+                if torch.cuda.current_stream(x.device) != torch.cuda.default_stream(x.device):
                     warnings.warn(
                         "filtered_lrelu called with non-default cuda stream but concurrent execution is not supported",
                         RuntimeWarning,

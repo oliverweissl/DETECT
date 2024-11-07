@@ -4,9 +4,7 @@ from torch import Tensor
 from ._ssim import get_ssim_d2
 
 
-def get_penalized_distance(
-    img: Tensor, p_img: Tensor, y_img: int, y_p_img: int
-) -> float:
+def get_penalized_distance(img: Tensor, p_img: Tensor, y_img: int, y_p_img: int) -> float:
     """
     Get penalized distance between two images using their labels.
 
