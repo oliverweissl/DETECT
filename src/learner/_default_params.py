@@ -22,6 +22,7 @@ PYMOO_DE_DEFAULT_PARAMS = {
     "algo_params": {
         "pop_size": 100,
         "sampling": LHS(),
-        "cr": 0.3,
+        "CR": 0.9,
+        "F": 0.8,
     },
 }

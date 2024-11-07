@@ -3,7 +3,7 @@ from numpy.typing import NDArray
 from scipy.ndimage import gaussian_filter
 
 
-def get_ssim_d2(i1: NDArray, i2: NDArray) -> float:
+def ssim_d2(i1: NDArray, i2: NDArray) -> float:
     """
     Get structural similarity between two images as D_2 metric.
 
@@ -42,4 +42,4 @@ def get_ssim_d2(i1: NDArray, i2: NDArray) -> float:
     d = np.sqrt(2.0 - s1 - s2)
 
     d2 = d[:, pad:-pad, pad:-pad].mean()
-    return d2
+    return d2 / np.sqrt(2)

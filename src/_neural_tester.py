@@ -185,7 +185,7 @@ class NeuralTester:
         smx_cond_arr, smx_weights_arr = self._learner.get_x_current()
         assert (
             0 <= smx_cond_arr.max() < num_wn_candidates
-        ), f"Error: StyleMixing Conditions reference indices of {smx_cond_arr.max()}, but we only have {len(wsc)} elements."
+        ), f"Error: StyleMixing Conditions reference indices of {smx_cond_arr.max()}, but we only have {num_wn_candidates} elements."
 
         images = []
         for smx_cond, smx_weights in zip(smx_cond_arr, smx_weights_arr):

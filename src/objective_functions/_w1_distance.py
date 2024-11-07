@@ -5,7 +5,7 @@ from scipy import sparse
 # from scipy.stats import wasserstein_distance_nd
 
 
-def get_w1_distance(u: NDArray, v: NDArray) -> float:
+def w1_distance(u: NDArray, v: NDArray) -> float:
     """
     Get the wasserstein-1 distance from two distributions.
 

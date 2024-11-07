@@ -34,13 +34,9 @@ class CMAESLearner(Learner):
         self._x_current_continuous = initial_mean
         self._optimizer = cma.CMAEvolutionStrategy(initial_mean, std, options)
 
-    def new_population(self, fitnesses: NDArray) -> None:
-        """
-        Generate a new population based on fitness of old population.
-
-        :param fitnesses: Fitness of the current population.
-        """
-        self._optimizer.tell(self._x_current_continuous, fitnesses)
+    def new_population(self) -> None:
+        """Generate a new population based on fitness of old population."""
+        self._optimizer.tell(self._x_current_continuous, self._fitness)
         new_candidates = self._optimizer.ask()
 
         self._x_current_continuous = new_candidates

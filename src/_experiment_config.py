@@ -1,11 +1,11 @@
 from dataclasses import dataclass, field
-from typing import Any, Type
+from typing import Callable, Type
 
 from .learner import Learner
 
 
 @dataclass
-class Config:
+class ExperimentConfig:
     """A simple Dataclass to store experiment configs."""
 
     samples_per_class: int  # How candidates should be searched for per class
@@ -15,7 +15,7 @@ class Config:
     generator: str  # The generator network.
     genome_size: int = field(init=False)  # The size of the genome.
     learner: Type[Learner]  # The learner type.
-    learner_params: dict[str, Any]
+    metric: Type[Callable]
 
     def __post_init__(self) -> None:
         self.genome_size = (
