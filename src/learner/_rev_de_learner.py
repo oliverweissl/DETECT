@@ -50,6 +50,7 @@ class RevDELearner(Learner):
 
         self._x_current = x0  # pop_size x genome size
         self._best_candidate = (None, np.inf)
+        self._learner_type = type(self)
 
     def new_population(self) -> None:
         """Generate a new population based on fitnesses of current population."""

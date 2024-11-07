@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Union
+from typing import Type, Union
 
 import numpy as np
 from numpy.typing import NDArray
@@ -13,10 +13,21 @@ class Learner(ABC):
     _x_current: NDArray
     _fitness: NDArray
 
+    _learner_type: Type
+
     @abstractmethod
     def new_population(self) -> None:
         """
         Generate a new population.
+        """
+        ...
+
+    @abstractmethod
+    def get_x_current(self) -> tuple[Union[NDArray, None], NDArray]:
+        """
+        Return the current population in specific format.
+
+        :return: The population as array of smx indices and smx weights.
         """
         ...
 
@@ -32,14 +43,10 @@ class Learner(ABC):
             (x_cand, f_min) if f_min < self._best_candidate[1] else self._best_candidate
         )
 
-    @abstractmethod
-    def get_x_current(self) -> tuple[Union[NDArray, None], NDArray]:
-        """
-        Return the current population in specific format.
-
-        :return: The population as array of smx indices and smx weights.
-        """
-        ...
+    def reset(self) -> None:
+        """Reset the learner to default."""
+        self._best_candidate = (None, np.inf)
+        self._x_current = np.random.rand(*self._x_current.shape)
 
     @property
     def best_candidate(self) -> tuple[Union[NDArray, None], float]:
@@ -50,7 +57,11 @@ class Learner(ABC):
         """
         return self._best_candidate
 
-    def reset(self) -> None:
-        """Reset the learner to default."""
-        self._best_candidate = (None, np.inf)
-        self._x_current = np.random.rand(*self._x_current.shape)
+    @property
+    def learner_type(self) -> Type:
+        """
+        Get the type of learner.
+
+        :returns: The type.
+        """
+        return self._learner_type

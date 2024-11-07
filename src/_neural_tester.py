@@ -132,9 +132,10 @@ class NeuralTester:
             logging.info(f"Running Search-Algorithm for {self._num_generations} generations.")
 
             # We define the inner loop with its parameters.
-            run_inner_loop = lambda: self._inner_loop(len(wsc), candidates, img_rgb, class_idx)
             for _ in range(self._num_generations):
-                images, fitness, p_labels = run_inner_loop()
+                images, fitness, p_labels = self._inner_loop(
+                    len(wsc), candidates, img_rgb, class_idx
+                )
                 # Assign fitness to current population.
                 self._learner.assign_fitness(fitness)
                 if fitness.min() <= self._learner.best_candidate[1]:
@@ -143,7 +144,9 @@ class NeuralTester:
                 # Generate a new population based on previous performance.
                 self._learner.new_population()
             else:
-                images, fitness, p_labels = run_inner_loop()
+                images, fitness, p_labels = self._inner_loop(
+                    len(wsc), candidates, img_rgb, class_idx
+                )
                 self._learner.assign_fitness(fitness)
                 if fitness.min() <= self._learner.best_candidate[1]:
                     candidate_prediction = p_labels[np.argmin(fitness)]
@@ -237,7 +240,7 @@ class NeuralTester:
                 "pop_size": self._learner._x_current.shape[0],
                 "experiment_start": exp_start,
                 "label": class_idx,
-                "tags": self._learner.__class__.__name__,
+                "learner_type": self._learner.learner_type,
             },
         )
 

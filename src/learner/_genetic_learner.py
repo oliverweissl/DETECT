@@ -33,6 +33,7 @@ class GeneticLearner(Learner):
 
         self._vec_mutate = np.vectorize(self._mutate)
         self._best_candidate = (None, np.inf)
+        self._learner_type = type(self)
 
     def new_population(self) -> None:
         """Generate a new population based on fitness of old population."""

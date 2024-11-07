@@ -29,17 +29,17 @@ def get_ssim_d2(i1: NDArray, i2: NDArray) -> float:
     vy = uyy - uy * uy  # local variance of y
     vxy = uxy - ux * uy  # local covariance between x and y
 
-    c1 = (0.01 * 1) ** 2  # (K1 * Data-Range)²
-    c2 = (0.03 * 1) ** 2  # (K2 * Data-Range)²
+    c1 = (0.01 * 1) ** 2.0  # (K1 * Data-Range)²
+    c2 = (0.03 * 1) ** 2.0  # (K2 * Data-Range)²
 
-    a1 = 2 * ux * uy + c1
-    a2 = 2 * vxy + c2
-    b1 = ux**2 + uy**2 + c1
+    a1 = 2.0 * ux * uy + c1
+    a2 = 2.0 * vxy + c2
+    b1 = ux**2.0 + uy**2.0 + c1
     b2 = vx + vy + c2
 
-    s1 = a1 / b1
-    s2 = a2 / b2
-    d = np.sqrt(2 - s1 - s2)
+    s1 = np.clip(a1 / b1, 0, 1)
+    s2 = np.clip(a2 / b2, 0, 1)
+    d = np.sqrt(2.0 - s1 - s2)
 
     d2 = d[:, pad:-pad, pad:-pad].mean()
     return d2
