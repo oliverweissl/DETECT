@@ -4,7 +4,7 @@ from numpy.typing import NDArray
 from torch import Tensor
 
 
-def get_penalized_distance(
+def penalized_distance(
     img: Tensor,
     p_img: Tensor,
     y_img: int,

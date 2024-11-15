@@ -10,6 +10,7 @@ from pymoo.core.termination import NoTermination
 from pymoo.problems.static import StaticProblem
 
 from ._learner import Learner
+from .auxiliary_components import LearnerCandidate
 
 
 class PymooLearner(Learner):
@@ -25,6 +26,7 @@ class PymooLearner(Learner):
         bounds: tuple[int, int],
         algorithm: Type[Algorithm],
         algo_params: dict[str, Any],
+        num_objectives: int,
     ) -> None:
         """
         Initialize the genetic learner.
@@ -33,24 +35,26 @@ class PymooLearner(Learner):
         :param bounds: Bounds for the optimizer.
         :param algorithm: The pymoo Algorithm.
         :param algo_params: Parameters for the pymoo Algorithm.
+        :param num_objectives: The number of objectives the learner can handle.
         """
         self._pymoo_algo = algorithm(**algo_params)
 
         lb, ub = bounds
-        self._problem = Problem(n_var=n_var, n_obj=1, xl=lb, xu=ub, vtype=float)
+        self._problem = Problem(n_var=n_var, n_obj=num_objectives, xl=lb, xu=ub, vtype=float)
         self._pymoo_algo.setup(self._problem, termination=NoTermination())
 
         self._pop_current = self._pymoo_algo.ask()
         self._x_current = self._pop_current.get("X")
 
-        self._best_candidate = (None, np.inf)
+        self._best_candidates = [LearnerCandidate(None, np.inf)]
         self._learner_type = type(self._pymoo_algo)
+        self._num_objectives = num_objectives
 
     def new_population(self) -> None:
         """
         Generate a new population.
         """
-        static = StaticProblem(self._problem, F=self._fitness)
+        static = StaticProblem(self._problem, F=np.column_stack(self._fitness))
         Evaluator().eval(static, self._pop_current)
         self._pymoo_algo.tell(self._pop_current)
 
@@ -63,8 +67,7 @@ class PymooLearner(Learner):
 
         :return: The population as array of smx indices and smx weights.
         """
-        smx_cond = np.zeros_like(
-            self._x_current
-        )  # TODO: for now only one element can be used to mix styles -> should be n elements.
+        # TODO: for now only one element can be used to mix styles -> should be n elements.
+        smx_cond = np.zeros_like(self._x_current)
         smx_weights = self._x_current
         return smx_cond, smx_weights

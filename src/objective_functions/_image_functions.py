@@ -1,6 +1,38 @@
 import numpy as np
 from numpy.typing import NDArray
+from scipy import sparse
 from scipy.ndimage import gaussian_filter
+from sewar import msssim
+from sewar import uqi as s_uqi
+
+
+def w1_distance(i1: NDArray, i2: NDArray) -> float:
+    """
+    Get the wasserstein-1 distance from two distributions.
+
+    :param i1: Distribution 1.
+    :param i2: Distribution 2.
+    :return: The distance [0,1].
+    """
+    raise NotImplementedError("This function is not yet implemented")
+    m, n = len(i1), len(i2)
+
+    i1 /= i1.sum()
+    i2 /= i2.sum()
+
+    A_u = sparse.block_diag((np.ones((1, n)),) * m)
+    A_l = sparse.hstack((sparse.eye(n),) * m)
+
+    A = sparse.vstack((A_u, A_l))
+    A = sparse.coo_array(A)
+
+    u1, u2 = i1.shape
+    v1, v2 = i2.shape
+    # TODO: this is WIP
+
+    distance = 1  # wasserstein_distance_nd(u, v)
+    assert 1 >= distance >= 0, "Distance does something weird."
+    return distance
 
 
 def ssim_d2(i1: NDArray, i2: NDArray) -> float:
@@ -43,3 +75,33 @@ def ssim_d2(i1: NDArray, i2: NDArray) -> float:
 
     d2 = d[:, pad:-pad, pad:-pad].mean()
     return d2 / np.sqrt(2)
+
+
+def ms_ssim(i1: NDArray, i2: NDArray) -> float:
+    """
+    Get the Multi-Scale SSIM score.
+
+    This score is in range (0,1) with 1 being the optimum.
+
+    :param i1: The base image.
+    :param i2: The modified image.
+    :returns: The score.
+    """
+    i1 = i1.transpose(1, 2, 0)
+    i2 = i2.transpose(1, 2, 0)
+    return msssim(i1, i2, MAX=1.0).real
+
+
+def uqi(i1: NDArray, i2: NDArray) -> float:
+    """
+    Get the Universal Image Quality Index score.
+
+    This score is in range (0,1) with 1 being the optimum.
+
+    :param i1: The base image.
+    :param i2: The modified image.
+    :returns: The score.
+    """
+    i1 = i1.transpose(1, 2, 0)
+    i2 = i2.transpose(1, 2, 0)
+    return s_uqi(i1, i2)

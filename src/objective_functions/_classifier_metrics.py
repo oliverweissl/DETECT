@@ -1,10 +1,9 @@
 import torch
 
 
-def get_accuracy(y_true: torch.Tensor, y_pred: torch.Tensor) -> float:
+def accuracy(y_true: torch.Tensor, y_pred: torch.Tensor) -> float:
     """
     Calculate the accuracy from prediction probabilities.
-
 
     :param y_true: The true labels.
     :param y_pred: The predicted probabilities.

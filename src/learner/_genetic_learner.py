@@ -4,6 +4,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from ._learner import Learner
+from .auxiliary_components import LearnerCandidate
 
 
 class GeneticLearner(Learner):
@@ -32,8 +33,9 @@ class GeneticLearner(Learner):
         self._mutation_rate = mutation_rate
 
         self._vec_mutate = np.vectorize(self._mutate)
-        self._best_candidate = (None, np.inf)
+        self._best_candidates = [LearnerCandidate(None, np.inf)]
         self._learner_type = type(self)
+        self._num_objectives = 1  # Set the number of objectives this learner can handle
 
     def new_population(self) -> None:
         """Generate a new population based on fitness of old population."""
@@ -66,7 +68,7 @@ class GeneticLearner(Learner):
         :param k: The number of contestants.
         :returns: The new population.
         """
-        p, f = self._x_current.copy(), self._fitness.copy()
+        p, f = self._x_current.copy(), self._fitness[0].copy()
         available_indices = np.arange(len(p))
         winners = []
         for _ in range(self._population_size):
@@ -97,8 +99,7 @@ class GeneticLearner(Learner):
 
         :return: The population as array of smx indices and smx weights.
         """
-        smx_cond = np.zeros_like(
-            self._x_current
-        )  # TODO: for now only one element can be used to mix styles -> should be n elements.
+        # TODO: for now only one element can be used to mix styles -> should be n elements.
+        smx_cond = np.zeros_like(self._x_current)
         smx_weights = self._x_current
         return smx_cond, smx_weights

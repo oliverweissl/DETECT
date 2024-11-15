@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import UserList
 from dataclasses import dataclass
+from typing import Optional
 
 import torch
 
@@ -13,8 +14,8 @@ class MixCandidate:
     label: int  # The class label of the candidate.
     is_w0: bool = False  # Whether candidate is used for w0 calculation.
     weight: float = 1.0  # The weight of the candidate for w0 calculation.
-    w_index: int | None = None  # Index in the w calculation.
-    w_tensor: torch.Tensor | None = None  # The latent vector if already generated.
+    w_index: Optional[int] = None  # Index in the w calculation.
+    w_tensor: Optional[torch.Tensor] = None  # The latent vector if already generated.
 
 
 class CandidateList(UserList):
@@ -24,11 +25,11 @@ class CandidateList(UserList):
     Note this list object is immutable and caches getters.
     """
 
-    _weights: list[float] | None
-    _labels: list[int] | None
-    _w_indices: list[int] | None
-    _w0_candidates: CandidateList | None
-    _wn_candidates: CandidateList | None
+    _weights: Optional[list[float]]
+    _labels: Optional[list[int]]
+    _w_indices: Optional[list[int]]
+    _w0_candidates: Optional[CandidateList]
+    _wn_candidates: Optional[CandidateList]
 
     def __init__(self, *initial_candidates: MixCandidate):
         super().__init__(initial_candidates)

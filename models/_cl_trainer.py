@@ -10,7 +10,7 @@ from torchvision.transforms.functional import to_pil_image
 from tqdm import tqdm
 
 import wandb
-from src.objective_functions import get_accuracy
+from src.objective_functions import accuracy
 
 
 @dataclass
@@ -163,7 +163,7 @@ class ClTrainer:
             self._scheduler.step()
             self._optimizer.zero_grad()
 
-            acc = get_accuracy(y, pred)
+            acc = accuracy(y, pred)
             tacc += acc
             tloss += loss.item()
             if self._log_inner:
@@ -191,7 +191,7 @@ class ClTrainer:
                 X, y = X.to(self._device), y.to(self._device)
                 pred = self._model(X)
 
-                acc = get_accuracy(y, pred)
+                acc = accuracy(y, pred)
                 tacc += acc
                 tloss += (loss := self._criterion(pred, y).item())
                 if self._log_inner:

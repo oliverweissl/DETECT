@@ -4,6 +4,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from ._learner import Learner
+from .auxiliary_components import LearnerCandidate
 
 
 class RevDELearner(Learner):
@@ -49,12 +50,13 @@ class RevDELearner(Learner):
         self._continuous = continuous
 
         self._x_current = x0  # pop_size x genome size
-        self._best_candidate = (None, np.inf)
+        self._best_candidates = [LearnerCandidate(None, np.inf)]
         self._learner_type = type(self)
+        self._num_objectives = 1
 
     def new_population(self) -> None:
-        """Generate a new population based on fitnesses of current population."""
-        x, f = self._select(self._x_current, self._fitness)
+        """Generate a new population based on the fitness of the current population."""
+        x, f = self._select(self._x_current, self._fitness[0])
         self._x_current = self._recombination(x)
 
     def get_x_current(self) -> tuple[Union[NDArray, None], NDArray]:
@@ -63,9 +65,8 @@ class RevDELearner(Learner):
 
         :return: The population as array of smx conditions and smx weights.
         """
-        smx_cond = np.zeros_like(
-            self._x_current
-        )  # TODO: for now only one element can be used to mix styles -> should be n elements.
+        # TODO: for now only one element can be used to mix styles -> should be n elements.
+        smx_cond = np.zeros_like(self._x_current)
         smx_weights = self._x_current if self._continuous else self._x_current.round(0)
         return smx_cond, smx_weights
 
