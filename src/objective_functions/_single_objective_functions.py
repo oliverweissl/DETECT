@@ -5,22 +5,22 @@ from torch import Tensor
 
 
 def penalized_distance(
-    img: Tensor,
-    p_img: Tensor,
-    y_img: int,
-    y_p_img: int,
+    i1: Tensor,
+    i2: Tensor,
+    y1: int,
+    y2: int,
     metric: Callable[[NDArray, NDArray], float],
 ) -> float:
     """
     Get penalized distance between two images using their labels.
 
-    :param img: The original image.
-    :param p_img: The perturbed image.
-    :param y_img: The original images label.
-    :param y_p_img: The perturbed images label.
+    :param i1: The original image.
+    :param i2: The perturbed image.
+    :param y1: The original images label.
+    :param y2: The perturbed images label.
     :param metric: The metric to calculate.
     :return: The distance measure [0,1].
     """
-    score = metric(img.cpu().numpy(), p_img.cpu().numpy())
-    distance = (1 - score) ** (0 if y_p_img == y_img else 1)
+    score = metric(i1.cpu().numpy(), i2.cpu().numpy())
+    distance = (1 - score) ** (0 if y2 < y1 else 1)
     return distance

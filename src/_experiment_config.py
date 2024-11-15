@@ -18,6 +18,5 @@ class ExperimentConfig:
     metric: Type[Callable]
 
     def __post_init__(self) -> None:
-        self.genome_size = (
-            self.mix_dim_range[1] - self.mix_dim_range[0]
-        )  # Calculate genome size from range of mixing.
+        # Calculate genome size from range of mixing.
+        self.genome_size = self.mix_dim_range[1] - self.mix_dim_range[0]

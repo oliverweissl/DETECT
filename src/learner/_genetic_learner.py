@@ -20,14 +20,22 @@ class GeneticLearner(Learner):
     def _mutate(x: int, p: float, mr: float) -> int:
         return 1 - x if p < mr else x
 
-    def __init__(self, x0: NDArray, population_size: int, mutation_rate: float = 0.05) -> None:
+    def __init__(
+        self,
+        x0: NDArray,
+        population_size: int,
+        mutation_rate: float = 0.05,
+        bounds: tuple[int, int] = (0, 1),
+    ) -> None:
         """
         Initialize the genetic learner.
 
         :param x0: The initial population.
         :param population_size: The population size.
         :param mutation_rate: The mutation rate.
+        :param bounds: The bounds of the genome.
         """
+        self._bounds = bounds
         self._x_current = x0
         self._population_size = population_size
         self._mutation_rate = mutation_rate

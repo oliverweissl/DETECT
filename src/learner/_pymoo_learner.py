@@ -19,6 +19,7 @@ class PymooLearner(Learner):
     _pymoo_algo: Algorithm
     _problem: Problem
     _pop_current: Population
+    _bounds: tuple[int, int]
 
     def __init__(
         self,
@@ -39,12 +40,12 @@ class PymooLearner(Learner):
         """
         self._pymoo_algo = algorithm(**algo_params)
 
-        lb, ub = bounds
+        self._bounds = lb, ub = bounds
         self._problem = Problem(n_var=n_var, n_obj=num_objectives, xl=lb, xu=ub, vtype=float)
         self._pymoo_algo.setup(self._problem, termination=NoTermination())
 
         self._pop_current = self._pymoo_algo.ask()
-        self._x_current = self._pop_current.get("X")
+        self._x_current = self._normalize_to_bounds(self._pop_current.get("X"))
 
         self._best_candidates = [LearnerCandidate(None, np.inf)]
         self._learner_type = type(self._pymoo_algo)
@@ -59,7 +60,7 @@ class PymooLearner(Learner):
         self._pymoo_algo.tell(self._pop_current)
 
         self._pop_current = self._pymoo_algo.ask()
-        self._x_current = self._pop_current.get("X")
+        self._x_current = self._normalize_to_bounds(self._pop_current.get("X"))
 
     def get_x_current(self) -> tuple[Union[NDArray, None], NDArray]:
         """

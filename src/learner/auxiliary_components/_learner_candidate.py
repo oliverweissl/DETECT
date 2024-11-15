@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from typing import Optional, Union
+from dataclasses import dataclass, field
+from typing import Any, Optional, Union
 
 from numpy.typing import NDArray
 
@@ -10,6 +10,8 @@ class LearnerCandidate:
 
     solution: Optional[NDArray]
     fitness: Union[tuple[float, ...], float, list[float]]
+    # Additional data that might be used.
+    data: Optional[Any] = field(default=None)
 
     def __post_init__(self) -> None:
         """Post init processing of data."""

@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import logging
 from datetime import datetime
 from itertools import product
-from typing import Callable
+from typing import Any, Protocol
 
 import numpy as np
 import torch
@@ -25,12 +27,15 @@ class NeuralTester:
     _device: torch.device
 
     """Evaluation functions."""
-    _objective_function: Callable[[Tensor, Tensor, int, int], float]
+    _objective_functions: list[_ObjectiveFunction]
 
     """Additional Parameters."""
     _num_generations: int
     _num_w0: int
     _num_ws: int
+
+    """Temporary Variables."""
+    _img_rgb: Tensor
 
     def __init__(
         self,
@@ -38,7 +43,7 @@ class NeuralTester:
         predictor: nn.Module,
         generator: nn.Module,
         learner: Learner,
-        objective_function: Callable[[Tensor, Tensor, int, int], float],
+        objective_functions: list[_ObjectiveFunction],
         num_generations: int,
         mix_dim_range: tuple[int, int],
         device: torch.device,
@@ -51,7 +56,7 @@ class NeuralTester:
         :param predictor: The predictor network to test boundaries for.
         :param generator: Thy style mixer, that generates new inputs.
         :param learner: The learner to find boundary candidates.
-        :param objective_function: The evaluation function for the learner.
+        :param objective_functions: The evaluation functions for the learner.
         :param num_generations: The number of generations for the Learner.
         :param mix_dim_range: The range of layers available for style mixing (default 1-15).
         :param device: The device to use.
@@ -64,11 +69,12 @@ class NeuralTester:
         self._learner = learner
         self._mixer = StyleMixer(generator, device, mix_dim_range)
 
-        self._objective_function = objective_function
+        self._objective_functions = objective_functions
 
         self._num_generations = num_generations
         self._num_w0 = num_w0
         self._num_ws = num_ws
+        self._mdr = mix_dim_range
 
         self._predictor.eval()
 
@@ -97,9 +103,9 @@ class NeuralTester:
                 # We generate w0 vector and the corresponding image X.
                 img, w = self._mixer.generate_X_w0(self._get_time_seed(), class_idx)
                 # We transform the image to RGB if it is in Grayscale.
-                img_rgb = self._assure_rgb(img)
+                self._img_rgb = self._assure_rgb(img)
 
-                y_hat = self._predictor(img_rgb)
+                y_hat = self._predictor(self._img_rgb)
                 """
                 Now we select primary and secondary predictions for further style mixing.
                 
@@ -112,7 +118,7 @@ class NeuralTester:
 
             # Logging Operations
             logging.info(f"\tFound {self._num_w0} valid seed(s) after: {while_counter} iterations.")
-            wandb.log({"base_image": wandb.Image(img_rgb, caption="Base Image")})
+            wandb.log({"base_image": wandb.Image(self._img_rgb, caption="Base Image")})
             wandb.summary["w0_trials"] = while_counter
 
             """
@@ -133,36 +139,38 @@ class NeuralTester:
 
             # We define the inner loop with its parameters.
             for _ in range(self._num_generations):
-                images, fitness, p_labels = self._inner_loop(
-                    len(wsc), candidates, img_rgb, class_idx
+                images, fitness = self._inner_loop(
+                    candidates,
+                    class_idx,
+                    second,
                 )
-                # Assign fitness to current population.
-                self._learner.assign_fitness(fitness)
-                if fitness.min() <= self._learner.best_candidate[1]:
-                    candidate_prediction = p_labels[np.argmin(fitness)]
-                    best_candidate_image = images[np.argmin(fitness)]
+                # Assign fitness to current population and additional data (in our case images).
+                self._learner.assign_fitness(fitness, data=images)
                 # Generate a new population based on previous performance.
                 self._learner.new_population()
             else:
-                images, fitness, p_labels = self._inner_loop(
-                    len(wsc), candidates, img_rgb, class_idx
-                )
-                self._learner.assign_fitness(fitness)
-                if fitness.min() <= self._learner.best_candidate[1]:
-                    candidate_prediction = p_labels[np.argmin(fitness)]
-                    best_candidate_image = images[np.argmin(fitness)]
+                images, fitness = self._inner_loop(candidates, class_idx, second)
+                self._learner.assign_fitness(fitness, data=images)
 
-            logging.info(f"\tBest candidate has a fitness of: {self._learner.best_candidate[1]}")
-            wandb.summary["best_fitness"] = self._learner.best_candidate[1]
-            wandb.summary["boundary_to"] = candidate_prediction
+            logging.info(
+                f"\tBest candidate(s) have a fitness of: {', '.join([str(c.fitness) for c in self._learner.best_candidates])}"
+            )
+            wandb.summary["boundary_to"] = second.item()
+
             wandb.log(
                 {
-                    "candidate_image": wandb.Image(
-                        best_candidate_image, caption="Best candidate image"
-                    ),
-                    "best_candidate": wandb.Table(
-                        columns=self._mixer._mix_dims.cpu().tolist(),
-                        data=[self._learner.best_candidate[0]],
+                    "best_candidates": wandb.Table(
+                        columns=[f"Obj{i}" for i in range(len(self._objective_functions))]
+                        + [f"Genome_{i}" for i in range(*self._mdr)]
+                        + ["Image"],
+                        data=[
+                            [
+                                *c.fitness,
+                                *c.solution,
+                                wandb.Image(c.data),
+                            ]
+                            for c in self._learner.best_candidates
+                        ],
                     ),
                 }
             )
@@ -170,22 +178,24 @@ class NeuralTester:
             logging.info("\tReset learner!")
 
     def _inner_loop(
-        self, num_wn_candidates: int, candidates: CandidateList, X: Tensor, y: int
-    ) -> tuple[list[Tensor], NDArray, Tensor]:
+        self,
+        candidates: CandidateList,
+        y: int,
+        y2: int,
+    ) -> tuple[list[Tensor], tuple[NDArray, ...]]:
         """
         The inner loop for the learner.
 
-        :param num_wn_candidates: The number of mixing candidates.
         :param candidates: The mixing candidates to be used.
-        :param X: The base image tensor.
         :param y: The base class label.
-        :returns: The images generated, the corresponding fitness and predicted labels.
+        :param y2: The second most likely label.
+        :returns: The images generated, and the corresponding fitness.
         """
         # Get the initial population of style mixing conditions and weights
         smx_cond_arr, smx_weights_arr = self._learner.get_x_current()
         assert (
-            0 <= smx_cond_arr.max() < num_wn_candidates
-        ), f"Error: StyleMixing Conditions reference indices of {smx_cond_arr.max()}, but we only have {num_wn_candidates} elements."
+            0 <= smx_cond_arr.max() < self._num_ws
+        ), f"Error: StyleMixing Conditions reference indices of {smx_cond_arr.max()}, but we only have {self._num_ws} elements."
 
         images = []
         for smx_cond, smx_weights in zip(smx_cond_arr, smx_weights_arr):
@@ -201,27 +211,37 @@ class NeuralTester:
 
         """We predict the label from the mixed images."""
         predictions: Tensor = self._predictor(torch.stack(images))
-        # Extract the predicted labels
-        predictions_labels = torch.argsort(predictions, dim=1, descending=True)[:, 0].flatten()
 
-        fitness = np.array(
+        fitness = tuple(
             [
-                self._objective_function(X.squeeze(0), Xp, y, yp)
-                for Xp, yp in zip(images, predictions_labels)
+                np.array(
+                    [
+                        of(
+                            i1=self._img_rgb.squeeze(0),
+                            i2=Xp,
+                            y1=yp[y],
+                            y2=yp[y2],
+                        )
+                        for Xp, yp in zip(images, predictions)
+                    ]
+                )
+                for of in self._objective_functions
             ]
         )
 
         # Logging Operations
-        wandb.log(
-            {
-                "min_fitness": fitness.min(),
-                "max_fitness": fitness.max(),
-                "mean_fitness": fitness.mean(),
-                "std_fitness": fitness.std(),
+        results = {}
+        # Log statistics for each objective function seperatly.
+        for i, obj in enumerate(fitness):
+            results |= {
+                f"min_obj{i}": obj.min(),
+                f"max_obj{i}": obj.max(),
+                f"mean_obj{i}": obj.mean(),
+                f"std_obj{i}": obj.std(),
             }
-        )
+        wandb.log(results)
 
-        return images, fitness, predictions_labels
+        return images, fitness
 
     def _init_wandb(self, exp_start: datetime, class_idx: int) -> None:
         """
@@ -268,3 +288,22 @@ class NeuralTester:
             return image.repeat(3, 1, 1)
         elif len(image.shape) == 2:
             return torch.unsqueeze(image, 0).repeat(3, 1, 1)
+
+
+class _ObjectiveFunction(Protocol):
+    """A simple way to assure type checking in Callables."""
+
+    def __call__(
+        self, i1: Tensor, i2: Tensor, y1: float, y2: float, *args: Any, **kwargs: Any
+    ) -> float:
+        """
+        Call the objective function.
+
+        :param i1: The first image tensor.
+        :param i2: The second image tensor.
+        :param y1: The true labels probability.
+        :param y2: The secondary labels probability.
+        :param args: Additional arguments.
+        :param kwargs: Additional key-word arguments.
+        """
+        ...
