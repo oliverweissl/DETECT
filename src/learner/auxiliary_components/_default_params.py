@@ -1,5 +1,6 @@
 """A collection of default parameters for the learner classes."""
 
+from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.algorithms.soo.nonconvex.de import DE
 from pymoo.operators.sampling.lhs import LHS
 
@@ -27,5 +28,15 @@ PYMOO_DE_DEFAULT_PARAMS = {
         "sampling": LHS(),
         "CR": 0.9,
         "F": 0.8,
+    },
+}
+
+PYMOO_NSGA2_DEFAULT_PARAMS = {
+    "bounds": (0, 1),
+    "algorithm": NSGA2,
+    "num_objectives": 2,
+    "algo_params": {
+        "pop_size": 100,
+        "sampling": LHS(),
     },
 }

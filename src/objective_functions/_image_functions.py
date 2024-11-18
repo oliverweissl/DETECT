@@ -1,3 +1,5 @@
+from typing import Any
+
 import numpy as np
 from numpy.typing import NDArray
 from scipy import sparse
@@ -6,12 +8,13 @@ from sewar import msssim
 from sewar import uqi as s_uqi
 
 
-def w1_distance(i1: NDArray, i2: NDArray) -> float:
+def w1_distance(*, i1: NDArray, i2: NDArray, **_: Any) -> float:
     """
     Get the wasserstein-1 distance from two distributions.
 
     :param i1: Distribution 1.
     :param i2: Distribution 2.
+    :param _: Additional unused kwargs.
     :return: The distance [0,1].
     """
     raise NotImplementedError("This function is not yet implemented")
@@ -35,7 +38,7 @@ def w1_distance(i1: NDArray, i2: NDArray) -> float:
     return distance
 
 
-def ssim_d2(i1: NDArray, i2: NDArray) -> float:
+def ssim_d2(*, i1: NDArray, i2: NDArray, **_: Any) -> float:
     """
     Get structural similarity between two images as D_2 metric.
 
@@ -45,6 +48,7 @@ def ssim_d2(i1: NDArray, i2: NDArray) -> float:
 
     :param i1: The first image (expects images of shape: CxHxW).
     :param i2: The second image (expects images of shape: CxHxW).
+    :param _: Additional unused kwargs.
     :returns: SSIM score.
     """
     truncate, sigma = 3.5, 1.5
@@ -77,7 +81,7 @@ def ssim_d2(i1: NDArray, i2: NDArray) -> float:
     return d2 / np.sqrt(2)
 
 
-def ms_ssim(i1: NDArray, i2: NDArray) -> float:
+def ms_ssim(*, i1: NDArray, i2: NDArray, **_: Any) -> float:
     """
     Get the Multi-Scale SSIM score.
 
@@ -85,6 +89,7 @@ def ms_ssim(i1: NDArray, i2: NDArray) -> float:
 
     :param i1: The base image.
     :param i2: The modified image.
+    :param _: Additional unused kwargs.
     :returns: The score.
     """
     i1 = i1.transpose(1, 2, 0)
@@ -92,7 +97,7 @@ def ms_ssim(i1: NDArray, i2: NDArray) -> float:
     return msssim(i1, i2, MAX=1.0).real
 
 
-def uqi(i1: NDArray, i2: NDArray) -> float:
+def uqi(*, i1: NDArray, i2: NDArray, **_: Any) -> float:
     """
     Get the Universal Image Quality Index score.
 
@@ -100,6 +105,7 @@ def uqi(i1: NDArray, i2: NDArray) -> float:
 
     :param i1: The base image.
     :param i2: The modified image.
+    :param _: Additional unused kwargs.
     :returns: The score.
     """
     i1 = i1.transpose(1, 2, 0)
