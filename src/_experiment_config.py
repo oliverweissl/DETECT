@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Callable, Type
-
-from .learner import Learner
+from torch import nn
 
 
 @dataclass
@@ -11,11 +10,11 @@ class ExperimentConfig:
     samples_per_class: int  # How candidates should be searched for per class
     generations: int  # How many generations we search for candidates.
     mix_dim_range: tuple[int, int]  # The range of mixing dimensions used.
-    predictor: str  # The predictor network.
-    generator: str  # The generator network.
+    predictor: nn.Module  # The predictor network.
+    generator:  nn.Module  # The generator network.
     genome_size: int = field(init=False)  # The size of the genome.
-    learner: Type[Learner]  # The learner type.
-    metric: Type[Callable]
+    metrics: list[Type[Callable]]  # The metrics used in search.
+    classes: int # The amount of classes in the experiment.
 
     def __post_init__(self) -> None:
         # Calculate genome size from range of mixing.

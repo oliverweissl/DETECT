@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from itertools import product
-from typing import Any, Protocol
 
 import numpy as np
 import torch
@@ -14,6 +13,7 @@ import wandb
 
 from .learner import Learner
 from .style_mixing import CandidateList, MixCandidate, StyleMixer
+from ._experiment_config import ExperimentConfig
 
 
 class NeuralTester:
@@ -26,11 +26,8 @@ class NeuralTester:
     _learner: Learner
     _device: torch.device
 
-    """Evaluation functions."""
-    _objective_functions: list[_ObjectiveFunction]
-
     """Additional Parameters."""
-    _num_generations: int
+    _config: ExperimentConfig
     _num_w0: int
     _num_ws: int
 
@@ -40,12 +37,8 @@ class NeuralTester:
     def __init__(
         self,
         *,
-        predictor: nn.Module,
-        generator: nn.Module,
+        config: ExperimentConfig,
         learner: Learner,
-        objective_functions: list[_ObjectiveFunction],
-        num_generations: int,
-        mix_dim_range: tuple[int, int],
         device: torch.device,
         num_w0: int = 1,
         num_ws: int = 1,
@@ -53,51 +46,40 @@ class NeuralTester:
         """
         Initialize the Neural Tester.
 
-        :param predictor: The predictor network to test boundaries for.
-        :param generator: Thy style mixer, that generates new inputs.
+        :param config: The experiment configuration.
         :param learner: The learner to find boundary candidates.
-        :param objective_functions: The evaluation functions for the learner.
-        :param num_generations: The number of generations for the Learner.
-        :param mix_dim_range: The range of layers available for style mixing (default 1-15).
         :param device: The device to use.
         :param num_w0: The number of w0 seeds to be generated.
         :param num_ws: The number of w seeds to be generated.
         """
         self._device = device
-        self._predictor = predictor.to(device)
-        self._generator = generator.to(device)
+        self._predictor = config.predictor.to(device)
+        self._generator = config.generator.to(device)
         self._learner = learner
-        self._mixer = StyleMixer(generator, device, mix_dim_range)
+        self._mixer = StyleMixer(self._generator, device, config.mix_dim_range)
 
-        self._objective_functions = objective_functions
 
-        self._num_generations = num_generations
         self._num_w0 = num_w0
         self._num_ws = num_ws
-        self._mdr = mix_dim_range
 
+        self._config = config
         self._predictor.eval()
 
-    def test(self, *, samples_per_class: int, num_classes: int):
-        """
-        Testing the predictor for its decision boundary using a set of (test!) Inputs.
-
-        :param samples_per_class: The number of samples per class to test for boundaries.
-        :param num_classes: The number of classes.
-        """
+    def test(self):
+        """Testing the predictor for its decision boundary using a set of (test!) Inputs."""
+        spc, nc = self._config.samples_per_class, self._config.classes
 
         logging.info(
-            f"Start testing. Number of classes: {num_classes}, iterations per class: {samples_per_class}, total iterations: {num_classes*samples_per_class}\n"
+            f"Start testing. Number of classes: {nc}, iterations per class: {spc}, total iterations: {nc*spc}\n"
         )
         exp_start = datetime.now()
-        for class_idx, sample_id in product(range(num_classes), range(samples_per_class)):
+        for class_idx, sample_id in product(range(nc), range(spc)):
             self._init_wandb(exp_start, class_idx)  # Initialize Wandb run for logging
 
             w0_tensors: list[Tensor] = []
             logging.info(f"Generate seed(s) for class: {class_idx}.")
-            while_counter = (
-                0  # For logging purposes to see how many samples we need to find valid seed.
-            )
+            # For logging purposes to see how many samples we need to find valid seed.
+            while_counter = 0
             while len(w0_tensors) < self._num_w0:  # Generate base seeds.
                 while_counter += 1
                 # We generate w0 vector and the corresponding image X.
@@ -135,10 +117,10 @@ class NeuralTester:
             candidates = CandidateList(*w0c, *wsc)
 
             # Now we run a search-based optimization strategy to find a good boundary candidate.
-            logging.info(f"Running Search-Algorithm for {self._num_generations} generations.")
+            logging.info(f"Running Search-Algorithm for {self._config.generations} generations.")
 
             # We define the inner loop with its parameters.
-            for _ in range(self._num_generations):
+            for _ in range(self._config.generations):
                 images, fitness = self._inner_loop(
                     candidates,
                     class_idx,
@@ -160,8 +142,8 @@ class NeuralTester:
             wandb.log(
                 {
                     "best_candidates": wandb.Table(
-                        columns=[f"Obj{i}" for i in range(len(self._objective_functions))]
-                        + [f"Genome_{i}" for i in range(*self._mdr)]
+                        columns=[f"Obj{i}" for i in range(len(self._config.metrics))]
+                        + [f"Genome_{i}" for i in range(*self._config.mix_dim_range)]
                         + ["Image"],
                         data=[
                             [
@@ -225,7 +207,7 @@ class NeuralTester:
                         for Xp, yp in zip(images, predictions)
                     ]
                 )
-                for of in self._objective_functions
+                for of in self._config.metrics
             ]
         )
 
@@ -253,7 +235,7 @@ class NeuralTester:
         wandb.init(
             project="NeuralStyleSearch",
             config={
-                "num_gen": self._num_generations,
+                "num_gen": self._config.generations,
                 "num_w0s": self._num_w0,
                 "num_wns": self._num_ws,
                 "mix_dims": self._mixer._mix_dims,
@@ -288,22 +270,3 @@ class NeuralTester:
             return image.repeat(3, 1, 1)
         elif len(image.shape) == 2:
             return torch.unsqueeze(image, 0).repeat(3, 1, 1)
-
-
-class _ObjectiveFunction(Protocol):
-    """A simple way to assure type checking in Callables."""
-
-    def __call__(
-        self, i1: Tensor, i2: Tensor, y1: float, y2: float, *args: Any, **kwargs: Any
-    ) -> float:
-        """
-        Call the objective function.
-
-        :param i1: The first image tensor.
-        :param i2: The second image tensor.
-        :param y1: The true labels probability.
-        :param y2: The secondary labels probability.
-        :param args: Additional arguments.
-        :param kwargs: Additional key-word arguments.
-        """
-        ...
