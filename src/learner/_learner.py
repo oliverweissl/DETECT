@@ -37,7 +37,7 @@ class Learner(ABC):
 
     def assign_fitness(self, fitness: Iterable[NDArray], data: Optional[Iterable]) -> None:
         """
-        Assign fitness to the current population and extract the best individual if it beats champion.
+        Assign fitness to the current population and extract the best individual using pareto frontier.
 
         :param fitness: The fitness to assign.
         :param data: Additional data for the candidates.
@@ -50,39 +50,47 @@ class Learner(ABC):
         ), f"Error: The number of fitness values is off. {len(fitness)} found, {self._num_objectives} needed."
 
         self._fitness = fitness
-        data = data or [None] * len(self._fitness)
-        self._get_best_candidates(data=data)
 
-    def _get_best_candidates(self, data: list[Any]) -> None:
-        """
-        Find and assign the best candidate in the current population.
+        """Since we can have an arbitrary amount of metrics we extract best candidates using a pareto frontier."""
+        new_metrics = np.asarray(
+            fitness
+        ).T  # Metrics are rows, instances are columns -> we transpose.
+        old_metrics = np.asarray([cand.fitness for cand in self._best_candidates])
+        metrics = np.vstack((new_metrics, old_metrics))
 
-        :param data: Additional data for the candidates.
-        """
-        # Get the new candidates with the best fitness.
-        new_candidates: set[np.int_] = set([np.argmin(metric) for metric in self._fitness])
+        new_data: list[Any] = [None] * new_metrics.shape[0] if data is None else list(data)
+        data = new_data + [cand.data for cand in self._best_candidates]
 
-        # We check against all current best candidates.
-        # And compare them to the new candidates individually.
-        for i, current_best in enumerate(self._best_candidates[:]):
-            for new_index in new_candidates:
-                # If any of the metrics for a current candidate is bigger than the new candidate we discard it.
-                new_f = tuple([metric[new_index] for metric in self._fitness])
-                if any((c > m for c, m in zip(current_best.fitness, new_f))):
-                    self._best_candidates.pop(i)
-                    c = LearnerCandidate(
-                        self._x_current[new_index],
-                        new_f,
-                        data[new_index],
-                    )
-                    self._best_candidates.append(c)
+        solutions = np.vstack(
+            (self._x_current, np.array([cand.solution for cand in self._best_candidates]))
+        )
+
+        sorted_indices = metrics.sum(1).argsort()
+        for i in range(metrics.shape[0]):
+            n = sorted_indices.shape[0]
+            on_pareto = np.ones(n, dtype=bool)
+            if i >= n:
+                break
+            on_pareto[i + 1 : n] = (
+                metrics[sorted_indices][i + 1 :] <= metrics[sorted_indices][i]
+            ).all(axis=1) & (metrics[sorted_indices][i + 1 :] < metrics[sorted_indices][i]).any(
+                axis=1
+            )
+            sorted_indices = sorted_indices[on_pareto[:n]]
+
+        candidates = []
+        for index in sorted_indices:
+            candidates.append(LearnerCandidate(solutions[index], metrics[index], data[index]))
+        self._best_candidates = candidates
 
     def reset(self) -> None:
         """Reset the learner to default."""
-        self._best_candidates = [LearnerCandidate(None, [np.inf] * self._num_objectives)]
         self._x_current = np.random.uniform(
             low=self._bounds[0], high=self._bounds[1], size=self._x_current.shape
         )
+        self._best_candidates = [
+            LearnerCandidate(self._x_current[0], [np.inf] * self._num_objectives)
+        ]
 
     @property
     def best_candidates(self) -> list[LearnerCandidate]:

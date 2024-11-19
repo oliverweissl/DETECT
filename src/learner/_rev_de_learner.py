@@ -50,7 +50,7 @@ class RevDELearner(Learner):
         self._continuous = continuous
 
         self._x_current = x0  # pop_size x genome size
-        self._best_candidates = [LearnerCandidate(None, np.inf)]
+        self._best_candidates = [LearnerCandidate(x0[0], np.inf)]
         self._learner_type = type(self)
         self._num_objectives = 1
 

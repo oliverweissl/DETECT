@@ -41,7 +41,7 @@ class GeneticLearner(Learner):
         self._mutation_rate = mutation_rate
 
         self._vec_mutate = np.vectorize(self._mutate)
-        self._best_candidates = [LearnerCandidate(None, np.inf)]
+        self._best_candidates = [LearnerCandidate(x0[0], np.inf)]
         self._learner_type = type(self)
         self._num_objectives = 1  # Set the number of objectives this learner can handle
 

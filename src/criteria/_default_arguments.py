@@ -24,5 +24,5 @@ class DefaultArguments:
 
     def __post_init__(self) -> None:
         """Additional processing after init."""
-        self.y1p = self.yp[self.y1]
-        self.y2p = self.yp[self.y2]
+        self.y1p = self.yp[self.y1].item()
+        self.y2p = self.yp[self.y2].item()

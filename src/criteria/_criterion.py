@@ -11,6 +11,7 @@ class Criterion(ABC):
         Evaluate the criterion in question.
 
         :param kwargs: The KW-Args parsed.
-        :returns: A value.
+        :returns: The value(s).
         """
         ...
+        # TODO: maybe return tuples always
