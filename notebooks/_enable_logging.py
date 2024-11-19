@@ -1,6 +1,7 @@
 import logging
 import sys
 
+
 def enable_logging() -> None:
     """Allow logging outputs in notebooks."""
     logging.basicConfig(

@@ -50,8 +50,7 @@ class Learner(ABC):
         ), f"Error: The number of fitness values is off. {len(fitness)} found, {self._num_objectives} needed."
 
         self._fitness = fitness
-        if data is None:
-            data = [None] * len(self._fitness)
+        data = data or [None] * len(self._fitness)
         self._get_best_candidates(data=data)
 
     def _get_best_candidates(self, data: list[Any]) -> None:

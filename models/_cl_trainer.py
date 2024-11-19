@@ -10,7 +10,9 @@ from torchvision.transforms.functional import to_pil_image
 from tqdm import tqdm
 
 import wandb
-from src.objective_functions import accuracy
+
+from src.criteria import Criterion
+from src.criteria.classifier_objectives import Accuracy
 
 
 @dataclass
@@ -33,6 +35,7 @@ class ClTrainer:
 
     _model: torch.nn.Module
     _criterion: torch.nn.Module
+    _evaluator: Criterion
     _optimizer: torch.optim.Optimizer
     _scheduler: object
 
@@ -93,6 +96,7 @@ class ClTrainer:
         self._model = model
         self._model.fc = torch.nn.Linear(model.fc.in_features, out_features)
         self._criterion = criterion()
+        self._evaluator = Accuracy()
         self._optimizer = optimizer(model.parameters(), lr=train_config.lr)
         self._scheduler = scheduler(
             self._optimizer,
@@ -163,7 +167,7 @@ class ClTrainer:
             self._scheduler.step()
             self._optimizer.zero_grad()
 
-            acc = accuracy(y, pred)
+            acc = self._evaluator.evaluate(y_true=y, y_pred=pred)
             tacc += acc
             tloss += loss.item()
             if self._log_inner:
@@ -191,7 +195,7 @@ class ClTrainer:
                 X, y = X.to(self._device), y.to(self._device)
                 pred = self._model(X)
 
-                acc = accuracy(y, pred)
+                acc = self._evaluator.evaluate(y_true=y, y_pred=pred)
                 tacc += acc
                 tloss += (loss := self._criterion(pred, y).item())
                 if self._log_inner:

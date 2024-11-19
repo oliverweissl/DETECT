@@ -11,9 +11,9 @@ from torch import Tensor, nn
 
 import wandb
 
+from ._experiment_config import ExperimentConfig
 from .learner import Learner
 from .style_mixing import CandidateList, MixCandidate, StyleMixer
-from ._experiment_config import ExperimentConfig
 
 
 class NeuralTester:
@@ -25,6 +25,7 @@ class NeuralTester:
     _mixer: StyleMixer
     _learner: Learner
     _device: torch.device
+    _softmax: nn.Module  # Allows to apply softmax to output of predictor
 
     """Additional Parameters."""
     _config: ExperimentConfig
@@ -58,12 +59,12 @@ class NeuralTester:
         self._learner = learner
         self._mixer = StyleMixer(self._generator, device, config.mix_dim_range)
 
-
         self._num_w0 = num_w0
         self._num_ws = num_ws
 
         self._config = config
         self._predictor.eval()
+        self._softmax = torch.nn.Softmax(dim=1)
 
     def test(self):
         """Testing the predictor for its decision boundary using a set of (test!) Inputs."""
@@ -193,21 +194,22 @@ class NeuralTester:
 
         """We predict the label from the mixed images."""
         predictions: Tensor = self._predictor(torch.stack(images))
-
+        predictions_softmax = self._softmax(predictions)
         fitness = tuple(
             [
                 np.array(
                     [
-                        of(
+                        criterion.evaluate(
                             i1=self._img_rgb.squeeze(0),
                             i2=Xp,
-                            y1=yp[y],
-                            y2=yp[y2],
+                            y1=yp[y].item(),
+                            y2=yp[y2].item(),
+                            y=yp,
                         )
-                        for Xp, yp in zip(images, predictions)
+                        for Xp, yp in zip(images, predictions_softmax)
                     ]
                 )
-                for of in self._config.metrics
+                for criterion in self._config.metrics
             ]
         )
 

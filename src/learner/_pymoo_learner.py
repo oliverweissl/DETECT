@@ -47,7 +47,7 @@ class PymooLearner(Learner):
         self._pop_current = self._pymoo_algo.ask()
         self._x_current = self._normalize_to_bounds(self._pop_current.get("X"))
 
-        self._best_candidates = [LearnerCandidate(None, np.inf)]
+        self._best_candidates = [LearnerCandidate(None, [np.inf] * num_objectives)]
         self._learner_type = type(self._pymoo_algo)
         self._num_objectives = num_objectives
 
