@@ -79,7 +79,7 @@ class Learner(ABC):
 
     def reset(self) -> None:
         """Reset the learner to default."""
-        self._best_candidates = [LearnerCandidate(None, np.inf)]
+        self._best_candidates = [LearnerCandidate(None, [np.inf] * self._num_objectives)]
         self._x_current = np.random.uniform(
             low=self._bounds[0], high=self._bounds[1], size=self._x_current.shape
         )

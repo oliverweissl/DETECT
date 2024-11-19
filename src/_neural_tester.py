@@ -12,6 +12,7 @@ from torch import Tensor, nn
 import wandb
 
 from ._experiment_config import ExperimentConfig
+from .criteria import DefaultArguments
 from .learner import Learner
 from .style_mixing import CandidateList, MixCandidate, StyleMixer
 
@@ -200,11 +201,13 @@ class NeuralTester:
                 np.array(
                     [
                         criterion.evaluate(
-                            i1=self._img_rgb.squeeze(0),
-                            i2=Xp,
-                            y1=yp[y].item(),
-                            y2=yp[y2].item(),
-                            y=yp,
+                            default_args=DefaultArguments(
+                                i1=self._img_rgb.squeeze(0),
+                                i2=Xp,
+                                y1=y,
+                                y2=y2,
+                                yp=yp,
+                            )
                         )
                         for Xp, yp in zip(images, predictions_softmax)
                     ]

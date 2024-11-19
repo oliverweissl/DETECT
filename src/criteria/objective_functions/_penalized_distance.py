@@ -1,6 +1,7 @@
-from torch import Tensor
+from typing import Any
 
 from .._criterion import Criterion
+from .._default_arguments import DefaultArguments
 
 
 class PenalizedDistance(Criterion):
@@ -16,16 +17,14 @@ class PenalizedDistance(Criterion):
         """
         self.metric = metric
 
-    def evaluate(self, *, i1: Tensor, i2: Tensor, y1: int, y2: int) -> float:
+    def evaluate(self, *, default_args: DefaultArguments, **_: Any) -> float:
         """
         Get penalized distance between two images using their labels.
 
-        :param i1: The original image.
-        :param i2: The perturbed image.
-        :param y1: The original images label.
-        :param y2: The perturbed images label.
+        :param default_args: The default args parsed by the NeuralTester.
+        :param _: Additional unused args.
         :return: The distance measure [0,1].
         """
-        score = self.metric.evaluate(i1=i1, i2=i2)
-        distance = (1 - score) ** (0 if y2 < y1 else 1)
+        score = self.metric.evaluate(default_args=default_args)
+        distance = (1 - score) ** (0 if default_args.y2p < default_args.y1p else 1)
         return distance

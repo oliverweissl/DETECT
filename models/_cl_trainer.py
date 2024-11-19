@@ -10,7 +10,6 @@ from torchvision.transforms.functional import to_pil_image
 from tqdm import tqdm
 
 import wandb
-
 from src.criteria import Criterion
 from src.criteria.classifier_objectives import Accuracy
 
