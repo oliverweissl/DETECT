@@ -35,7 +35,7 @@ class Learner(ABC):
         """
         ...
 
-    def assign_fitness(self, fitness: Iterable[NDArray], data: Optional[Iterable]) -> None:
+    def assign_fitness(self, fitness: Iterable[NDArray], *data: Optional[Iterable]) -> None:
         """
         Assign fitness to the current population and extract the best individual using pareto frontier.
 
@@ -58,7 +58,7 @@ class Learner(ABC):
         old_metrics = np.asarray([cand.fitness for cand in self._best_candidates])
         metrics = np.vstack((new_metrics, old_metrics))
 
-        new_data: list[Any] = [None] * new_metrics.shape[0] if data is None else list(data)
+        new_data: list[Any] = [None] * new_metrics.shape[0] if data is None else list(zip(*data))
         data = new_data + [cand.data for cand in self._best_candidates]
 
         solutions = np.vstack(

@@ -20,7 +20,6 @@ class StyleMixer:
     _has_input_transform: bool
     _noise_mode: str
 
-    _pinned_bufs: dict  # Custom buffer for GPU? NVIDIA stuff I guess.
     _mix_dims: Tensor  # Range for dimensions to mix styles with.
 
     def __init__(
@@ -53,8 +52,8 @@ class StyleMixer:
     def mix(
         self,
         candidates: CandidateList,
-        smx_cond: list[int],
-        smx_weights: list[float],
+        sm_cond: list[int],
+        sm_weights: list[float],
         random_seed: int = 0,
     ) -> Tensor:
         """
@@ -63,76 +62,47 @@ class StyleMixer:
         This function is heavily inspired by the Renderer class of the original StyleGANv3 codebase.
 
         :param candidates: The candidates used for style-mixing.
-        :param smx_cond: The style mix conditions (layer combinations).
-        :param smx_weights: The weights for mixing layers.
+        :param sm_cond: The style mix conditions (layer combinations).
+        :param sm_weights: The weights for style mixing layers.
         :param random_seed: The seed for randomization.
         :returns: The generated image (C x H x W) as float with range [0, 255].
         """
-        assert len(smx_cond) == len(smx_weights), "Error: The parameters have to be of same length."
+        assert len(sm_cond) == len(sm_weights), "Error: The parameters have to be of same length."
 
         if self._has_input_transform:
             m = np.eye(3)
-            # TODO: maybe add custom transformations
             self._generator.synthesis.input.transform.copy_(torch.from_numpy(m))
 
-        """Generate latents for wn."""
-        num_candidates = len(candidates.wn_candidates)
+        w_avg = self._generator.mapping.w_avg
+        wn_tensors = torch.vstack(candidates.wn_candidates.w_tensors) - w_avg
 
-        all_zs = np.zeros(
-            [num_candidates, self._generator.z_dim], dtype=np.float32
-        )  # Latent inputs
-        all_cs = np.zeros(
-            [num_candidates, self._generator.c_dim], dtype=np.float32
-        )  # Input classes
-        all_cs[list(range(num_candidates)), candidates.wn_candidates.labels] = (
-            1  # Set classes in class vector
-        )
+        """Get w0 vector."""
+        w0_weights = (candidates.w0_candidates.weights,)
+        assert all(
+            (sum(w) == 1 for w in w0_weights)
+        ), f"Error: w0 weight do not sum up to one: {w0_weights}."
+        w0_weight_tensor = torch.as_tensor(w0_weights, device=self._device)[:, None, None]
+        w0_tensors = torch.stack(candidates.w0_candidates.w_tensors) - w_avg
+        w0 = (w0_tensors * w0_weight_tensor).sum(dim=0)  # Initialize base using w0 seeds.
 
-        # Custom cast to device by NVIDIA
-        all_zs = self._to_device(torch.from_numpy(all_zs))
-        all_cs = self._to_device(torch.from_numpy(all_cs))
-
-        ws_average = self._generator.mapping.w_avg
-        all_ws = (
-            self._generator.mapping(z=all_zs, c=all_cs, truncation_psi=1, truncation_cutoff=0)
-            - ws_average
-        )
-
-        """Get candidates for w0 calculation."""
-        w0_weights, w0_tensors = (
-            candidates.w0_candidates.weights,
-            candidates.w0_candidates.w_tensors,
-        )
-        assert sum(w0_weights) == 1, f"Error: w0 weight do not sum up to one: {w0_weights}."
-        weight_tensor = torch.as_tensor(w0_weights, device=self._device)[:, None, None]
-        w0_tensors = torch.stack(w0_tensors) - ws_average
-
-        w0 = (w0_tensors * weight_tensor).sum(dim=0)  # Initialize base using w0 seeds.
-        w = torch.zeros_like(w0, device=self._device, dtype=torch.float32)  # Empty w vector
-        """
-        Here we do style mixing.
-
-        Since we want to mix w0 with wn we take the ws in wn to mix and apply their weights.
-        smx indices do not contain w0  --> the index of wn in all_ws is different to index of wn in smx_indices.
-        Here we convert the indices to condition such that we know which w to take for each layer (If only one candidate this is array of equal integers).
-        """
-        # wn_w_cond = [candidates.wn_candidates.w_indices[cond] for cond in smx_cond]
-        smw_tensor = torch.as_tensor(smx_weights, device=self._device)[:, None]  # |_mix_dims| x 1
+        """Here we do style mixing."""
+        w = torch.zeros_like(w0, device=self._device, dtype=torch.float32)  # Empty final-w vector
+        smw_tensor = torch.as_tensor(sm_weights, device=self._device)[:, None]  # |mix_dims| x 1
         assert (lmd := len(self._mix_dims)) == (
-            lsmx := len(smx_cond)
+            lsmx := len(sm_cond)
         ), f"Error SMX condition array is not the same size as the mix dimensions ({lmd} vs {lsmx}). This might be due to a mismatch in genome size."
-        w[:, self._mix_dims] += all_ws[smx_cond, self._mix_dims, :] * smw_tensor + w0[
-            :, self._mix_dims
-        ] * (torch.ones_like(smw_tensor, device=self._device) - smw_tensor)
-        w += ws_average
+        comp1 = wn_tensors[sm_cond, self._mix_dims, :] * smw_tensor
+
+        w[:, self._mix_dims] += comp1 + w0[:, self._mix_dims] * (1 - smw_tensor)
+        w += w_avg
 
         torch.manual_seed(random_seed)
         img = self.get_image(w)
         return img
 
-    def get_w0(self, seed: int, class_idx: int) -> Tensor:
+    def get_w(self, seed: int, class_idx: int) -> Tensor:
         """
-        Generate w0 vector.
+        Generate w vector.
 
         :param seed: The seed to generate.
         :param class_idx: The label.
@@ -176,17 +146,6 @@ class StyleMixer:
         return image
 
     # ------------------ Copied from https://github.com/NVlabs/stylegan3/blob/main/viz/renderer.py -----------------------
-    def _get_pinned_buf(self, ref):
-        key = (tuple(ref.shape), ref.dtype)
-        buf = self._pinned_bufs.get(key, None)
-        if buf is None:
-            buf = torch.empty(ref.shape, dtype=ref.dtype).pin_memory()
-            self._pinned_bufs[key] = buf
-        return buf
-
-    def _to_device(self, buf):
-        return self._get_pinned_buf(buf).copy_(buf).to(self._device)
-
     @staticmethod
     def _run_synthesis_net(net, *args, capture_layer=None, **kwargs):  # => out, layers
         submodule_names = {mod: name for name, mod in net.named_modules()}

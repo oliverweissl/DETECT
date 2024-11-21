@@ -1,4 +1,4 @@
-"""A package for style mixing and auxiliary elements."""
+"""A package for latent space manipulators and auxiliary elements."""
 
 from ._mix_candidate import CandidateList, MixCandidate
 from ._style_mixer import StyleMixer
