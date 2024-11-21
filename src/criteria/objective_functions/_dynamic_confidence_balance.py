@@ -9,6 +9,8 @@ from .._default_arguments import DefaultArguments
 class DynamicConfidenceBalance(Criterion):
     """Implements a dynamic confidence balance measure."""
 
+    _name: str = "DynCB"
+
     def evaluate(self, *, default_args: DefaultArguments, **_: Any) -> float:
         """
         Calculate the confidence balance of 2 confidence values.

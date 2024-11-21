@@ -35,6 +35,7 @@ class SSIMD2(Criterion):
         :param k2: The K2 coefficient.
         """
         self.truncate, self.sigma, self.k1, self.k2 = truncate, sigma, k1, k2
+        self._name = "SSIM-D2"
 
     def evaluate(
         self,

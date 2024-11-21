@@ -10,6 +10,8 @@ from ._prepare_tensor import prepare_tensor
 class CosDissimilarity(Criterion):
     """Implements cos dissimilarity measure."""
 
+    _name: str = "CosDissim"
+
     def evaluate(self, *, default_args: DefaultArguments, **_: Any) -> float:
         """
         Get the cosine-dissimilarity between two images.

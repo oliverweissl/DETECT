@@ -7,6 +7,8 @@ from .._default_arguments import DefaultArguments
 class NaiveConfidenceBalance(Criterion):
     """Implements a naive confidence balance measure."""
 
+    _name: str = "NaiveCB"
+
     def evaluate(self, *, default_args: DefaultArguments, **_: Any) -> float:
         """
         Calculate the confidence balance of two confidence values.

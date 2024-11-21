@@ -5,6 +5,8 @@ from typing import Any
 class Criterion(ABC):
     """A criterion, allowing to evaluate events."""
 
+    _name: str
+
     @abstractmethod
     def evaluate(self, **kwargs: Any) -> float:
         """
@@ -15,3 +17,12 @@ class Criterion(ABC):
         """
         ...
         # TODO: maybe return tuples always
+
+    @property
+    def name(self) -> str:
+        """
+        Get the criterions name.
+
+        :returns: The name.
+        """
+        return self._name

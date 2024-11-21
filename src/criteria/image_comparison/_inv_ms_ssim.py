@@ -10,6 +10,8 @@ from ._prepare_tensor import prepare_tensor
 class InvMSSSIM(Criterion):
     """Implements the inversed Multi-Scale SSIM using sewar."""
 
+    _name: str = "InvMS-SSIM"
+
     def evaluate(self, *, default_args: DefaultArguments, **_: Any) -> float:
         """
         Get the inversed Multi-Scale SSIM score.

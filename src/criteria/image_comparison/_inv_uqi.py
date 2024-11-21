@@ -10,6 +10,8 @@ from ._prepare_tensor import prepare_tensor
 class InvUQI(Criterion):
     """Implements the inverse universal image quality index using sewar."""
 
+    _name: str = "InvUQI"
+
     def evaluate(self, *, default_args: DefaultArguments, **_: Any) -> float:
         """
         Get the inversed Universal Image Quality Index score.

@@ -11,6 +11,8 @@ from ._prepare_tensor import prepare_tensor
 class CFrobeniusDistance(Criterion):
     """Implements a channel-wise Frobenius Distance measure."""
 
+    _name: str = "CFrobDistance"
+
     def evaluate(self, *, default_args: DefaultArguments, **_: Any) -> float:
         """
         Calculate the normalized frobenius distance between two tensors that range [0,1].

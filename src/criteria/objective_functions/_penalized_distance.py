@@ -7,6 +7,7 @@ from .._default_arguments import DefaultArguments
 class PenalizedDistance(Criterion):
     """Implements the penalized distance measure."""
 
+    _name: str = "PenalizedDistance"
     metric: Criterion
 
     def __init__(self, metric: Criterion) -> None:

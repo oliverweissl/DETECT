@@ -138,7 +138,7 @@ class NeuralTester:
             wandb.log(
                 {
                     "best_candidates": wandb.Table(
-                        columns=[f"Obj{i}" for i in range(len(self._config.metrics))]
+                        columns=[metric.name for metric in self._config.metrics]
                         + [f"Genome_{i}" for i in range(*self._config.mix_dim_range)]
                         + ["Image"],
                         data=[
@@ -213,12 +213,12 @@ class NeuralTester:
         # Logging Operations
         results = {}
         # Log statistics for each objective function seperatly.
-        for i, obj in enumerate(fitness):
+        for metric, obj in zip(self._config.metrics, fitness):
             results |= {
-                f"min_obj{i}": obj.min(),
-                f"max_obj{i}": obj.max(),
-                f"mean_obj{i}": obj.mean(),
-                f"std_obj{i}": obj.std(),
+                f"min_{metric.name}": obj.min(),
+                f"max_{metric.name}": obj.max(),
+                f"mean_{metric.name}": obj.mean(),
+                f"std_{metric.name}": obj.std(),
             }
         wandb.log(results)
 

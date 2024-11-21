@@ -7,6 +7,8 @@ from .._criterion import Criterion
 class Accuracy(Criterion):
     """Implements Accuracy as a criterion."""
 
+    _name: str = "Accuracy"
+
     def evaluate(self, y_true: Tensor, y_pred: Tensor) -> float:
         """
         Calculate the accuracy from prediction probabilities.
