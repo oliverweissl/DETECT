@@ -26,7 +26,7 @@ class NeuralTester:
     _mixer: StyleMixer
     _learner: Learner
     _device: torch.device
-    _softmax: nn.Module  # Allows to apply softmax to output of predictor
+    _softmax: nn.Module
 
     """Additional Parameters."""
     _config: ExperimentConfig
@@ -183,7 +183,7 @@ class NeuralTester:
                     [
                         criterion.evaluate(
                             default_args=DefaultArguments(
-                                i1=self._img_rgb.squeeze(0),
+                                i1=self._img_rgb,
                                 i2=Xp,
                                 y1=y,
                                 y2=y2,
