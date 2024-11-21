@@ -1,5 +1,6 @@
 """A collection of default parameters for the learner classes."""
 
+from pymoo.algorithms.moo.age2 import AGEMOEA2
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.algorithms.soo.nonconvex.de import DE
 from pymoo.operators.sampling.lhs import LHS
@@ -37,6 +38,15 @@ PYMOO_NSGA2_DEFAULT_PARAMS = {
     "num_objectives": 2,
     "algo_params": {
         "pop_size": 100,
+        "sampling": LHS(),
+    },
+}
+
+PYMOO_AGE_MOEA_DEFAULT_PARAMS = {
+    "bounds": (0, 1),
+    "algorithm": AGEMOEA2,
+    "num_objectives": 2,
+    "algo_params": {
         "sampling": LHS(),
     },
 }

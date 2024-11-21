@@ -18,16 +18,17 @@ class StyleMixer:
     _generator: torch.nn.Module
     _device: torch.device
     _has_input_transform: bool
+    _noise_mode: str
 
     _pinned_bufs: dict  # Custom buffer for GPU? NVIDIA stuff I guess.
     _mix_dims: Tensor  # Range for dimensions to mix styles with.
-    _z_generator: torch.Generator
 
     def __init__(
         self,
         generator: torch.nn.Module,
         device: torch.device,
         mix_dims: tuple[int, int],
+        noise_mode: str = "random",
     ):
         """
         Initialize the StyleMixer object.
@@ -35,18 +36,19 @@ class StyleMixer:
         :param generator: The generator network to use.
         :param device: The torch device to use (should be cuda).
         :param mix_dims: The w-dimensions to use for mixing (range index).
+        :param noise_mode: The noise mode to be used for generation (const, random).
         """
         self._generator = generator
         self._device = device
         self._has_input_transform = hasattr(generator.synthesis, "input") and hasattr(
             generator.synthesis.input, "transform"
         )
+        self._noise_mode = noise_mode
+
         self._pinned_bufs = {}
         self._mix_dims = torch.arange(
             *mix_dims, device=self._device
         )  # Dimensions of w -> we only want to mix style layers.
-
-        self._z_generator = torch.Generator(device=self._device)
 
     def mix(
         self,
@@ -54,7 +56,6 @@ class StyleMixer:
         smx_cond: list[int],
         smx_weights: list[float],
         random_seed: int = 0,
-        noise_mode: str = "random",
     ) -> Tensor:
         """
         Generate data using style mixing.
@@ -65,8 +66,7 @@ class StyleMixer:
         :param smx_cond: The style mix conditions (layer combinations).
         :param smx_weights: The weights for mixing layers.
         :param random_seed: The seed for randomization.
-        :param noise_mode: The noise to use for style generation (const, random).
-        :returns: The generated image (C x H x W) as float with range [0, 1].
+        :returns: The generated image (C x H x W) as float with range [0, 255].
         """
         assert len(smx_cond) == len(smx_weights), "Error: The parameters have to be of same length."
 
@@ -127,41 +127,53 @@ class StyleMixer:
         w += ws_average
 
         torch.manual_seed(random_seed)
-        out, _ = self._run_synthesis_net(
-            self._generator.synthesis, w, noise_mode=noise_mode, force_fp32=False
-        )
-
-        """Convert the output to an image format."""
-        sel = out[0].to(torch.float32)  # 1 x C x W x H -> C x W x H
-        img = sel / sel.norm(float("inf"), dim=[1, 2], keepdim=True).clip(
-            1e-8, 1e8
-        )  # Normalize color range.
+        img = self.get_image(w)
         return img
 
-    def generate_X_w0(self, seed: int, class_idx: int) -> tuple[Tensor, Tensor]:
+    def get_w0(self, seed: int, class_idx: int) -> Tensor:
         """
-        Generate w0 vector and corresponding image.
+        Generate w0 vector.
 
         :param seed: The seed to generate.
         :param class_idx: The label.
-        :returns: The image and w vector.
+        :returns: The w vector.
         """
-        self._z_generator.manual_seed(seed)
+        torch.manual_seed(seed)
 
-        z = torch.randn(
-            size=[1, self._generator.z_dim],
-            device=self._device,
-            generator=self._z_generator,
-        )  # Generate latent vector for X
-        label = torch.zeros(size=[1, self._generator.c_dim], device=self._device)
-        w = (
-            self._generator.mapping(z=z, c=label, truncation_psi=1, truncation_cutoff=0)
-            - self._generator.mapping.w_avg
+        # Generate latent vectors
+        z = torch.randn(size=[1, self._generator.z_dim], device=self._device)
+        c = torch.zeros(size=[1, self._generator.c_dim], device=self._device)
+        c[:, class_idx] = 1
+        w = self._generator.mapping(z=z, c=c, truncation_psi=1, truncation_cutoff=0)
+        return w
+
+    def get_image(self, w: Tensor) -> Tensor:
+        """
+        Get a generated image from the w Vector.
+
+        :param w: The w vector for generation.
+        :returns: The generated image.
+        """
+        out, _ = self._run_synthesis_net(
+            self._generator.synthesis, w, noise_mode=self._noise_mode, force_fp32=False
         )
-        label[:, class_idx] = 1
+        img = self._transform_image_output(out)
+        return img
 
-        X = self._generator(z, label, noise_mode="random")
-        return X, w
+    @staticmethod
+    def _transform_image_output(image: Tensor, full_range: bool = False) -> Tensor:
+        """
+        Transform generated image output.
+
+        :param image: The image to be transformed.
+        :param full_range: If the image should be casted to range [0,255] or [0,1].
+        :returns: The transformed image.
+        """
+        image = image[0].to(torch.float32)  # 1 x C x W x H -> C x W x H
+        # Normalize color range.
+        image /= image.norm(float("inf"), dim=[1, 2], keepdim=True).clip(1e-8, 1e8)
+        image = (image * 127.5 + 128).clamp(0, 255) if full_range else ((image + 1) / 2).clamp(0, 1)
+        return image
 
     # ------------------ Copied from https://github.com/NVlabs/stylegan3/blob/main/viz/renderer.py -----------------------
     def _get_pinned_buf(self, ref):

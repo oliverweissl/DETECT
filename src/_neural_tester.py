@@ -85,10 +85,10 @@ class NeuralTester:
             while len(w0_tensors) < self._num_w0:  # Generate base seeds.
                 while_counter += 1
                 # We generate w0 vector and the corresponding image X.
-                img, w = self._mixer.generate_X_w0(self._get_time_seed(), class_idx)
-                # We transform the image to RGB if it is in Grayscale.
-                self._img_rgb = self._assure_rgb(img)
-
+                w = self._mixer.get_w0(self._get_time_seed(), class_idx)
+                img = self._mixer.get_image(w)
+                # We transform the image to RGB if it is in Grayscale and add batch dimension.
+                self._img_rgb = self._assure_rgb(img).unsqueeze(0)
                 y_hat = self._predictor(self._img_rgb)
                 """
                 Now we select primary and secondary predictions for further style mixing.
@@ -120,21 +120,15 @@ class NeuralTester:
 
             # Now we run a search-based optimization strategy to find a good boundary candidate.
             logging.info(f"Running Search-Algorithm for {self._config.generations} generations.")
-
-            # We define the inner loop with its parameters.
             for _ in range(self._config.generations):
-                images, fitness = self._inner_loop(
-                    candidates,
-                    class_idx,
-                    second,
-                )
+                # We define the inner loop with its parameters.
+                images, fitness = self._inner_loop(candidates, class_idx, second)
                 # Assign fitness to current population and additional data (in our case images).
                 self._learner.assign_fitness(fitness, data=images)
-                # Generate a new population based on previous performance.
                 self._learner.new_population()
-            else:
-                images, fitness = self._inner_loop(candidates, class_idx, second)
-                self._learner.assign_fitness(fitness, data=images)
+            # Evaluate the last generation.
+            images, fitness = self._inner_loop(candidates, class_idx, second)
+            self._learner.assign_fitness(fitness, data=images)
 
             logging.info(
                 f"\tBest candidate(s) have a fitness of: {', '.join([str(c.fitness) for c in self._learner.best_candidates])}"
@@ -243,7 +237,7 @@ class NeuralTester:
                 "num_gen": self._config.generations,
                 "num_w0s": self._num_w0,
                 "num_wns": self._num_ws,
-                "mix_dims": self._mixer._mix_dims,
+                "mix_dims": self._config.mix_dim_range,
                 "pop_size": self._learner._x_current.shape[0],
                 "experiment_start": exp_start,
                 "label": class_idx,

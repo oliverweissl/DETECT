@@ -1,15 +1,17 @@
 from typing import Any
 
+import numpy as np
+
 from .._criterion import Criterion
 from .._default_arguments import DefaultArguments
 
 
-class NaiveConfidenceBalance(Criterion):
-    """Implements a naive confidence balance measure."""
+class DynamicConfidenceBalance(Criterion):
+    """Implements a dynamic confidence balance measure."""
 
     def evaluate(self, *, default_args: DefaultArguments, **_: Any) -> float:
         """
-        Calculate the confidence balance of two confidence values.
+        Calculate the confidence balance of 2 confidence values.
 
         This functions assumes input range of [0, 1].
 
@@ -17,7 +19,9 @@ class NaiveConfidenceBalance(Criterion):
         :param _: Unused kwargs.
         :returns: The value.
         """
-        # TODO: investigate to improve this since |d| makes this non-linear.
-        s = default_args.y1p + default_args.y2p
-        d = default_args.y1p - default_args.y2p
+        yp_arr = default_args.yp.detach().cpu().numpy()
+        y = np.ma.array(yp_arr, mask=False)
+        y.mask[default_args.y1] = True
+        s = default_args.y1p + y.max()
+        d = default_args.y1p - y.max()
         return abs(d) / s
