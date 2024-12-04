@@ -5,6 +5,7 @@ from datetime import datetime
 from itertools import product
 
 import numpy as np
+import pandas as pd
 import torch
 from numpy.typing import NDArray
 from torch import Tensor, nn
@@ -66,6 +67,8 @@ class NeuralTester:
         self._config = config
         self._predictor.eval()
         self._softmax = torch.nn.Softmax(dim=1)
+
+        self._df = pd.DataFrame(columns=["X", "y", "Xp", "yp"])
 
     def test(self):
         """Testing the predictor for its decision boundary using a set of (test!) Inputs."""
@@ -139,8 +142,19 @@ class NeuralTester:
                     ),
                 }
             )
+            Xp, yp = self._learner.best_candidates[0].data
+            results = [
+                self._img_rgb.cpu().detach().numpy(),
+                w0_ys[0],
+                Xp.cpu().detach().numpy(),
+                yp.cpu().detach().numpy(),
+            ]
+            self._df.concat(results)
             self._learner.reset()  # Reset the learner for new candidate.
             logging.info("\tReset learner!")
+
+        if self._config.save_to is not None:
+            self._df.to_parquet(f"{self._config.save_to}.parquet", index=False)
 
     def _inner_loop(
         self,

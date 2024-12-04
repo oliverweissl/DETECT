@@ -72,7 +72,11 @@ class ClTrainer:
         :param workers: The number of workers for data loaders (default=2).
         :param log_inner: If wandb logging should log step in epoch.
         """
-        self._label_dict = {y: x for x, y in train_dataset.class_to_idx.items()} if hasattr(train_dataset, "class_to_idx") else None
+        self._label_dict = (
+            {y: x for x, y in train_dataset.class_to_idx.items()}
+            if hasattr(train_dataset, "class_to_idx")
+            else None
+        )
         self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self._config = train_config
         self._log_inner = log_inner
@@ -135,7 +139,9 @@ class ClTrainer:
             plt.subplot(size, size, i + 1)
             image = to_pil_image(img)
             plt.imshow(image)
-            plt.title(self._label_dict[lab.item()] if self._label_dict is not None else "No Label dict")
+            plt.title(
+                self._label_dict[lab.item()] if self._label_dict is not None else "No Label dict"
+            )
             plt.axis("off")
             if i + 2 > size**2:
                 break

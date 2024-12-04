@@ -26,7 +26,7 @@ class CFrobeniusDistance(Criterion):
         mean_fn = (
             sum([self._frob(i1[..., j] - i2[..., j]) for j in range(i1.shape[-1])]) / i1.shape[-1]
         )
-        return mean_fn / ub
+        return abs(self._inverse.real - mean_fn / ub)
 
     @staticmethod
     def _frob(matrix: NDArray) -> float:

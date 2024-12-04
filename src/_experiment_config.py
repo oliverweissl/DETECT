@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Optional
 
 from torch import nn
 
@@ -17,6 +18,9 @@ class ExperimentConfig:
     genome_size: int = field(init=False)  # The size of the genome.
     metrics: list[Criterion]  # The metrics used in search.
     classes: int  # The amount of classes in the experiment.
+    save_to: Optional[str] = field(
+        default=None
+    )  # The name of the dataframe to save to, if None dont save.
 
     def __post_init__(self) -> None:
         # Calculate genome size from range of mixing.

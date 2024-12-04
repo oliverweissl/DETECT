@@ -6,6 +6,15 @@ class Criterion(ABC):
     """A criterion, allowing to evaluate events."""
 
     _name: str
+    _inverse: bool
+
+    def __init__(self, inverse: bool = False) -> None:
+        """
+        Initialize the criterion.
+
+        :param inverse: Whether the criterion should be inverted.
+        """
+        self._inverse = inverse
 
     @abstractmethod
     def evaluate(self, **kwargs: Any) -> float:
