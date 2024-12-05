@@ -143,13 +143,8 @@ class NeuralTester:
                 }
             )
             Xp, yp = self._learner.best_candidates[0].data
-            results = [
-                self._img_rgb.cpu().detach().numpy(),
-                w0_ys[0],
-                Xp.cpu().detach().numpy(),
-                yp.cpu().detach().numpy(),
-            ]
-            self._df.concat(results)
+            results = [self._img_rgb.tolist(), w0_ys[0].tolist(), Xp.tolist(), yp]
+            self._df.loc[len(self._df)] = results
             self._learner.reset()  # Reset the learner for new candidate.
             logging.info("\tReset learner!")
 

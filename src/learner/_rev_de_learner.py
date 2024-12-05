@@ -27,6 +27,7 @@ class RevDELearner(Learner):
         self,
         x0: NDArray,
         population_size: int,
+        num_objectives: int,
         bounds: tuple[int, int] = (0, 1),
         f: float = 0.9,
         cr: float = 0.5,
@@ -37,6 +38,7 @@ class RevDELearner(Learner):
 
         :param x0: The initial genetic material.
         :param population_size: The size of the population.
+        :param num_objectives: The number of objectives used in the learner.
         :param bounds: The bounds of the population.
         :param f: The scaling factor.
         :param cr: The crossover rate.
@@ -52,7 +54,7 @@ class RevDELearner(Learner):
         self._x_current = x0  # pop_size x genome size
         self._best_candidates = [LearnerCandidate(x0[0], np.inf)]
         self._learner_type = type(self)
-        self._num_objectives = 1
+        self._num_objectives = num_objectives
 
     def new_population(self) -> None:
         """Generate a new population based on the fitness of the current population."""

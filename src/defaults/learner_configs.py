@@ -11,19 +11,16 @@ REV_DE_DEFAULT_PARAMS = {
     "bounds": (0, 1),
     "continuous": True,
     "population_size": 30,
-    "num_objectives": 1,
 }
 
 GENETIC_DEFAULT_PARAMS = {
     "population_size": 30,
     "mutation_rate": 0.05,
-    "num_objectives": 1,
 }
 
 PYMOO_DE_DEFAULT_PARAMS = {
     "bounds": (-100, 100),
     "algorithm": DE,
-    "num_objectives": 1,
     "algo_params": {
         "pop_size": 100,
         "sampling": LHS(),
@@ -35,7 +32,6 @@ PYMOO_DE_DEFAULT_PARAMS = {
 PYMOO_NSGA2_DEFAULT_PARAMS = {
     "bounds": (0, 1),
     "algorithm": NSGA2,
-    "num_objectives": 2,
     "algo_params": {
         "pop_size": 100,
         "sampling": LHS(),
@@ -45,7 +41,6 @@ PYMOO_NSGA2_DEFAULT_PARAMS = {
 PYMOO_AGE_MOEA_DEFAULT_PARAMS = {
     "bounds": (0, 1),
     "algorithm": AGEMOEA2,
-    "num_objectives": 2,
     "algo_params": {
         "sampling": LHS(),
     },

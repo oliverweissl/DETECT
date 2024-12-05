@@ -47,7 +47,7 @@ class Learner(ABC):
 
         assert (
             len(fitness) == self._num_objectives
-        ), f"Error: The number of fitness values is off. {len(fitness)} found, {self._num_objectives} needed."
+        ), f"Error: {len(fitness)} Fitness values found, {self._num_objectives} needed."
 
         self._fitness = fitness
 

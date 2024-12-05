@@ -24,6 +24,7 @@ class GeneticLearner(Learner):
         self,
         x0: NDArray,
         population_size: int,
+        num_objectives: int,
         mutation_rate: float = 0.05,
         bounds: tuple[int, int] = (0, 1),
     ) -> None:
@@ -32,6 +33,7 @@ class GeneticLearner(Learner):
 
         :param x0: The initial population.
         :param population_size: The population size.
+        :param num_objectives: The number of objectives used in the learner.
         :param mutation_rate: The mutation rate.
         :param bounds: The bounds of the genome.
         """
@@ -43,7 +45,7 @@ class GeneticLearner(Learner):
         self._vec_mutate = np.vectorize(self._mutate)
         self._best_candidates = [LearnerCandidate(x0[0], np.inf)]
         self._learner_type = type(self)
-        self._num_objectives = 1  # Set the number of objectives this learner can handle
+        self._num_objectives = num_objectives
 
     def new_population(self) -> None:
         """Generate a new population based on fitness of old population."""
