@@ -17,11 +17,11 @@ In the targeted case we want to find a perturbed input with a specific class.
 Note that generally this can be a discrete problem where we check, if misclassified. 
 But for optimization continuous problems produce better results, therefore we use confidence imbalance.
 """
-UNTARGETED_ADVESERIAL_TESTING = [
+UNTARGETED_ADVESARIAL_TESTING = [
     CFrobeniusDistance(),
     NaiveConfidenceBalance(inverse=True, target_primary=False),
 ]
-TARGETED_ADVESRIAL_TESTING = [
+TARGETED_ADVESARIAL_TESTING = [
     CFrobeniusDistance(),
     DynamicConfidenceBalance(inverse=True, target_primary=False),
 ]

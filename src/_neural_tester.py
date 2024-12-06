@@ -149,7 +149,7 @@ class NeuralTester:
             logging.info("\tReset learner!")
 
         if self._config.save_to is not None:
-            self._df.to_parquet(f"{self._config.save_to}.parquet", index=False)
+            self._df.to_csv(f"{self._config.save_to}.csv", index=False)
 
     def _inner_loop(
         self,
