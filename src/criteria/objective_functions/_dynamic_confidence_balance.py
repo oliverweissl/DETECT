@@ -35,12 +35,12 @@ class DynamicConfidenceBalance(Criterion):
         yp_arr = default_args.yp.detach().cpu().numpy()
         y = np.delete(yp_arr, default_args.y1)
         s = default_args.y1p + y.max()
-        d = default_args.y1p - y.max()
+        d = abs(default_args.y1p - y.max())
         if self._target_primary is None:
-            return abs(self._inverse.real - (d + 1) / 2 / s)
+            return abs(self._inverse.real - d / s)
         else:
             return abs(
                 self._inverse.imag
                 - (y.max() if self._target_primary else default_args.y1p)
-                - (d + 1) / 2 / s
+                - d / s
             )

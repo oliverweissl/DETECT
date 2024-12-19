@@ -32,13 +32,13 @@ class NaiveConfidenceBalance(Criterion):
         """
         # TODO: investigate to improve this since |d| makes this non-linear.
         s = default_args.y1p + default_args.y2p
-        d = default_args.y1p - default_args.y2p
+        d = abs(default_args.y1p - default_args.y2p)
 
         if self._target_primary is None:
-            return abs(self._inverse.real - (d+1) / 2 / s)
+            return abs(self._inverse.real - d / s)
         else:
             return abs(
                 self._inverse.real
                 - (default_args.y2p if self._target_primary else default_args.y1p)
-                - (d + 1) / 2 / s
+                - d / s
             )
