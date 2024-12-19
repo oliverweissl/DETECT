@@ -114,6 +114,7 @@ def main(*,
         config=conf,
         learner=learner,
         device=torch.device("cuda"),
+        silent_wandb=True,
     )
 
     # We start the testing procedure.

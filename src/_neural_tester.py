@@ -45,6 +45,7 @@ class NeuralTester:
         device: torch.device,
         num_w0: int = 1,
         num_ws: int = 1,
+        silent_wandb: bool = False,
     ):
         """
         Initialize the Neural Tester.
@@ -54,6 +55,7 @@ class NeuralTester:
         :param device: The device to use.
         :param num_w0: The number of w0 seeds to be generated.
         :param num_ws: The number of w seeds to be generated.
+        :para silent_wandb: Whether to silence wandb.
         """
         self._device = device
         self._predictor = config.predictor.to(device)
@@ -69,6 +71,7 @@ class NeuralTester:
         self._softmax = torch.nn.Softmax(dim=1)
 
         self._df = pd.DataFrame(columns=["X", "y", "Xp", "yp", "runtime"])
+        self._silent = silent_wandb
 
     def test(self):
         """Testing the predictor for its decision boundary using a set of (test!) Inputs."""
@@ -79,7 +82,7 @@ class NeuralTester:
         )
         exp_start = datetime.now()
         for class_idx, sample_id in product(range(nc), range(spc)):
-            self._init_wandb(exp_start, class_idx)  # Initialize Wandb run for logging
+            self._init_wandb(exp_start, class_idx, self._silent)  # Initialize Wandb run for logging
 
             w0_tensors, w0_images, w0_ys, w0_trials = self._generate_seeds(self._num_w0, class_idx)
 
@@ -253,7 +256,7 @@ class NeuralTester:
         logging.info(f"\tFound {amount} valid seed(s) after: {trials} iterations.")
         return ws, imgs, y_hats, trials
 
-    def _init_wandb(self, exp_start: datetime, class_idx: int) -> None:
+    def _init_wandb(self, exp_start: datetime, class_idx: int, silent: bool) -> None:
         """
         Initialize Wandb Run for logging
 
@@ -272,6 +275,7 @@ class NeuralTester:
                 "label": class_idx,
                 "learner_type": self._learner.learner_type,
             },
+            settings=wandb.Settings(silent=silent)
         )
 
     @staticmethod
