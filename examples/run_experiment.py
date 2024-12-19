@@ -67,56 +67,39 @@ MODEL_COMBINATIONS = {
 }
 
 
-def main() -> None:
-    """Run the experiments done in the paper."""
+def main(*,
+         objective: str,
+         dataset: str,
+         predictor: str,
+         generator: str,
+         mix_dims: tuple[int, int],
+         generations: int = 150,
+         ) -> None:
+    """
+    Run the experiments done in the paper.
 
-    wandb.login()
-    parser = argparse.ArgumentParser("Start a latent manipulation testing experiment.")
-    parser.add_argument(
-        "-ds",
-        "--dataset",
-        help="Dataset used for testing.",
-        type=str,
-        choices=["MNIST", "CIFAR10", "FashionMNIST", "SVHN", "Imagenet"],
-    )
-    parser.add_argument(
-        "-g",
-        "--generator",
-        help="Generator used for testing.",
-        type=str,
-        choices=["sg2", "sg3", "sgXL"],
-    )
-    parser.add_argument(
-        "-p", "--predictor", help="Predictor used for testing.", type=str, choices=["wrn", "vit"]
-    )
-    parser.add_argument(
-        "-o",
-        "--objective",
-        help="Objective of the testing",
-        type=str,
-        choices=["ubt", "tbt", "uat", "tat", "ds"],
-    )
-    parser.add_argument(
-        "--generations", help="Number of generations to run for.", type=int, default=150
-    )
-    parser.add_argument("--mix-dims", help="Mixing dimensions to use.", type=_int_tuple)
-
-    args = parser.parse_args()
+    :param objective: The objective for optimization.
+    :param dataset: The dataset for to test with.
+    :param predictor: The predictor to test.
+    :param generator: The generator to generate test cases.
+    :param mix_dims: The dimensions to mix in the generator.
+    :param generations: The number of generations to run the optimization.
+    """
 
     # Define the configurations for our experiments.
-    metrics = OBJECTIVES[args.objective]
-    p = MODEL_COMBINATIONS[args.dataset][args.predictor]
-    g = MODEL_COMBINATIONS[args.dataset][args.generator]
+    metrics = OBJECTIVES[objective]
+    p = MODEL_COMBINATIONS[dataset][predictor]
+    g = MODEL_COMBINATIONS[dataset][generator]
 
     conf = ExperimentConfig(
         samples_per_class=10,
-        generations=args.generations,
-        mix_dim_range=args.mix_dims,
+        generations=generations,
+        mix_dim_range=mix_dims,
         predictor=torch.load(p),  # The System under test (SUT).
         generator=load_stylegan(g),  # The generator network.
         metrics=metrics,
         classes=10,
-        save_to=f"results_lmt_{args.dataset}_{args.predictor}_{args.generator}_{args.objective}",
+        save_to=f"results_lmt_{dataset}_{predictor}_{generator}_{objective}",
     )
 
     learner_params = PYMOO_AGE_MOEA_DEFAULT_PARAMS
@@ -148,4 +131,43 @@ def _int_tuple(s: str) -> tuple[int, ...]:
 
 
 if __name__ == "__main__":
-    main()
+    wandb.login()
+    parser = argparse.ArgumentParser("Start a latent manipulation testing experiment.")
+    parser.add_argument(
+        "-ds",
+        "--dataset",
+        help="Dataset used for testing.",
+        type=str,
+        choices=["MNIST", "CIFAR10", "FashionMNIST", "SVHN", "Imagenet"],
+    )
+    parser.add_argument(
+        "-g",
+        "--generator",
+        help="Generator used for testing.",
+        type=str,
+        choices=["sg2", "sg3", "sgXL"],
+    )
+    parser.add_argument(
+        "-p", "--predictor", help="Predictor used for testing.", type=str, choices=["wrn", "vit"]
+    )
+    parser.add_argument(
+        "-o",
+        "--objective",
+        help="Objective of the testing",
+        type=str,
+        choices=["ubt", "tbt", "uat", "tat", "ds"],
+    )
+    parser.add_argument(
+        "--generations", help="Number of generations to run for.", type=int, default=150
+    )
+    parser.add_argument("--mix-dims", help="Mixing dimensions to use.", type=_int_tuple)
+    args = parser.parse_args()
+
+    main(
+        objective=args.objective,
+        generator=args.generator,
+        predictor=args.predictor,
+        dataset=args.dataset,
+        generations=args.generations,
+        mix_dims=args.mix_dims,
+    )

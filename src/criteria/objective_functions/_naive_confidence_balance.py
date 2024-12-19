@@ -35,10 +35,10 @@ class NaiveConfidenceBalance(Criterion):
         d = default_args.y1p - default_args.y2p
 
         if self._target_primary is None:
-            return abs(self._inverse.real - abs(d) / s)
+            return abs(self._inverse.real - (d+1) / 2 / s)
         else:
             return abs(
                 self._inverse.real
                 - (default_args.y2p if self._target_primary else default_args.y1p)
-                - abs(d) / s
+                - (d + 1) / 2 / s
             )

@@ -68,7 +68,7 @@ class NeuralTester:
         self._predictor.eval()
         self._softmax = torch.nn.Softmax(dim=1)
 
-        self._df = pd.DataFrame(columns=["X", "y", "Xp", "yp"])
+        self._df = pd.DataFrame(columns=["X", "y", "Xp", "yp", "runtime"])
 
     def test(self):
         """Testing the predictor for its decision boundary using a set of (test!) Inputs."""
@@ -143,7 +143,7 @@ class NeuralTester:
                 }
             )
             Xp, yp = self._learner.best_candidates[0].data
-            results = [self._img_rgb.tolist(), w0_ys[0].tolist(), Xp.tolist(), yp]
+            results = [self._img_rgb.tolist(), w0_ys[0].tolist(), Xp.tolist(), yp, datetime.now()-exp_start]
             self._df.loc[len(self._df)] = results
             self._learner.reset()  # Reset the learner for new candidate.
             logging.info("\tReset learner!")

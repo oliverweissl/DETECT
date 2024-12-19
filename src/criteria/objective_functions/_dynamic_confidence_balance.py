@@ -37,10 +37,10 @@ class DynamicConfidenceBalance(Criterion):
         s = default_args.y1p + y.max()
         d = default_args.y1p - y.max()
         if self._target_primary is None:
-            return abs(self._inverse.real - abs(d) / s)
+            return abs(self._inverse.real - (d + 1) / 2 / s)
         else:
             return abs(
                 self._inverse.imag
                 - (y.max() if self._target_primary else default_args.y1p)
-                - abs(d) / s
+                - (d + 1) / 2 / s
             )
