@@ -20,8 +20,8 @@ class IsMisclassified(Criterion):
         :returns: The value.
         """
         result = (
-            default_args.y1 == default_args.y2
+            default_args.y1 == default_args.yp.argmax()
             if self._inverse
-            else default_args.y1 != default_args.y2
+            else default_args.y1 != default_args.yp.argmax()
         )
         return result

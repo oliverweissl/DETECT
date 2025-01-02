@@ -15,7 +15,7 @@ class DefaultArguments:
     i2: Tensor  # The generated image
 
     y1: int  # The primary class
-    y2: int  # The second most likely class
+    y2: int  # The secondary class
 
     yp: Tensor  # Class probabilities
 
