@@ -7,14 +7,14 @@ from .._default_arguments import DefaultArguments
 from ._prepare_tensor import prepare_tensor
 
 
-class InvMSSSIM(Criterion):
-    """Implements the inversed Multi-Scale SSIM using sewar."""
+class MSSSIM(Criterion):
+    """Implements the Multi-Scale SSIM using sewar."""
 
-    _name: str = "InvMS-SSIM"
+    _name: str = "MS-SSIM"
 
     def evaluate(self, *, default_args: DefaultArguments, **_: Any) -> float:
         """
-        Get the inversed Multi-Scale SSIM score.
+        Get the Multi-Scale SSIM score.
 
         This score is in range (0,1) with 0 being the optimum.
 
@@ -23,4 +23,4 @@ class InvMSSSIM(Criterion):
         :returns: The score.
         """
         i1, i2 = prepare_tensor(default_args.i1), prepare_tensor(default_args.i2)
-        return 1 - msssim(i1, i2, MAX=1.0).real
+        return 1 - msssim(i1, i2, MAX=1.0).real if self._inverse else msssim(i1, i2, MAX=1.0).real

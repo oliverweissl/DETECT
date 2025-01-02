@@ -7,14 +7,14 @@ from .._default_arguments import DefaultArguments
 from ._prepare_tensor import prepare_tensor
 
 
-class InvUQI(Criterion):
-    """Implements the inverse universal image quality index using sewar."""
+class UQI(Criterion):
+    """Implements the universal image quality index using sewar."""
 
-    _name: str = "InvUQI"
+    _name: str = "UQI"
 
     def evaluate(self, *, default_args: DefaultArguments, **_: Any) -> float:
         """
-        Get the inversed Universal Image Quality Index score.
+        Get the Universal Image Quality Index score.
 
         This score is in range (0,1) with 0 being the optimum.
 
@@ -23,4 +23,4 @@ class InvUQI(Criterion):
         :returns: The score.
         """
         i1, i2 = prepare_tensor(default_args.i1), prepare_tensor(default_args.i2)
-        return 1 - uqi(i1, i2)
+        return 1 - uqi(i1, i2) if self._inverse else uqi(i1, i2)

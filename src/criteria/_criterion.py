@@ -15,6 +15,7 @@ class Criterion(ABC):
         :param inverse: Whether the criterion should be inverted.
         """
         self._inverse = inverse
+        self._name = self._name + "Inv" if inverse else self._name
 
     @abstractmethod
     def evaluate(self, **kwargs: Any) -> float:
