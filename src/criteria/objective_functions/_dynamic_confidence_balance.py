@@ -33,7 +33,7 @@ class DynamicConfidenceBalance(Criterion):
         :returns: The value.
         """
         yp_arr = default_args.yp.detach().cpu().numpy()
-        y = np.delete(yp_arr, default_args.y1)
+        y = np.delete(yp_arr, default_args.c1)
         s = default_args.y1p + y.max()
         d = abs(default_args.y1p - y.max())
         if self._target_primary is None:

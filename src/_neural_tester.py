@@ -157,15 +157,15 @@ class NeuralTester:
     def _inner_loop(
         self,
         candidates: CandidateList,
-        y: int,
-        y2: int,
+        c1: int,
+        c2: int,
     ) -> tuple[list[Tensor], tuple[NDArray, ...], Tensor]:
         """
         The inner loop for the learner.
 
         :param candidates: The mixing candidates to be used.
-        :param y: The base class label.
-        :param y2: The second most likely label.
+        :param c1: The base class label.
+        :param c2: The second most likely label.
         :returns: The images generated, and the corresponding fitness and the softmax predictions.
         """
         # Get the initial population of style mixing conditions and weights
@@ -197,8 +197,8 @@ class NeuralTester:
                             default_args=DefaultArguments(
                                 i1=self._img_rgb,
                                 i2=Xp,
-                                y1=y,
-                                y2=y2,
+                                c1=c1,
+                                c2=c2,
                                 yp=yp,
                             )
                         )

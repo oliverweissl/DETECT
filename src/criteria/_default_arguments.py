@@ -14,8 +14,8 @@ class DefaultArguments:
     i1: Tensor  # The primary image
     i2: Tensor  # The generated image
 
-    y1: int  # The primary class
-    y2: int  # The secondary class
+    c1: int  # The primary class
+    c2: int  # The secondary class
 
     yp: Tensor  # Class probabilities
 
@@ -24,5 +24,5 @@ class DefaultArguments:
 
     def __post_init__(self) -> None:
         """Additional processing after init."""
-        self.y1p = self.yp[self.y1].item()
-        self.y2p = self.yp[self.y2].item()
+        self.y1p = self.yp[self.c1].item()
+        self.y2p = self.yp[self.c2].item()
