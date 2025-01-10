@@ -12,18 +12,18 @@ from ..criteria.objective_functions import (
 When doing adveserial testing we aim to find inputs that are close to the original, but perturb the classifiers predictions.
 
 In the untargeted case we do not care what class the perturbed input fall into.
-In the targeted case we want to find a perturbed input with a specific class.
+In the targeted case we want to find a perturbed input with a specific (secondary) class.
 
 Note that generally this can be a discrete problem where we check, if misclassified. 
 But for optimization continuous problems produce better results, therefore we use confidence imbalance.
 """
 UNTARGETED_ADVESARIAL_TESTING = [
     CFrobeniusDistance(),
-    NaiveConfidenceBalance(inverse=True, target_primary=False),
+    DynamicConfidenceBalance(inverse=True, target_primary=False),
 ]
 TARGETED_ADVESARIAL_TESTING = [
     CFrobeniusDistance(),
-    DynamicConfidenceBalance(inverse=True, target_primary=False),
+    NaiveConfidenceBalance(inverse=True, target_primary=False),
 ]
 
 """
@@ -38,7 +38,7 @@ TARGETED_BOUNDARY_TESTING = [NaiveConfidenceBalance()]
 
 """
 ### DIVERSITY SAMPLING:
-Diversity testing aims to find inputs that are not observed in the training data, but are inferred by the classifer.
+Diversity testing aims to find inputs that are dissimilar to the provided data, but are inferred by the classifer.
 
 Here we want to find inputs that are classified correctly but have a high distance to the initial input.
 """

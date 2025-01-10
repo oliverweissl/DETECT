@@ -3,7 +3,7 @@ from typing import Any
 import numpy as np
 
 from .._criterion import Criterion
-from .._default_arguments import DefaultArguments
+from .._criteria_arguments import CriteriaArguments
 from ._prepare_tensor import prepare_tensor
 
 
@@ -12,7 +12,7 @@ class CosDissimilarity(Criterion):
 
     _name: str = "CosDissim"
 
-    def evaluate(self, *, default_args: DefaultArguments, **_: Any) -> float:
+    def evaluate(self, *, default_args: CriteriaArguments, **_: Any) -> float:
         """
         Get the cosine-dissimilarity between two images.
 

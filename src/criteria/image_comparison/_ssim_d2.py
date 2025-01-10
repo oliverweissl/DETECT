@@ -4,7 +4,7 @@ import numpy as np
 from scipy.ndimage import gaussian_filter
 
 from .._criterion import Criterion
-from .._default_arguments import DefaultArguments
+from .._criteria_arguments import CriteriaArguments
 from ._prepare_tensor import prepare_tensor
 
 
@@ -40,7 +40,7 @@ class SSIMD2(Criterion):
     def evaluate(
         self,
         *,
-        default_args: DefaultArguments,
+        default_args: CriteriaArguments,
         **_: Any,
     ) -> float:
         """

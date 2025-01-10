@@ -4,7 +4,7 @@ from torch import Tensor
 
 
 @dataclass
-class DefaultArguments:
+class CriteriaArguments:
     """
     A class to store the default arguments used in the NeuralTester.
 
@@ -14,6 +14,7 @@ class DefaultArguments:
     i1: Tensor  # The primary image
     i2: Tensor  # The generated image
 
+    """The classes do not have to be the most likely ones!"""
     c1: int  # The primary class
     c2: int  # The secondary class
 

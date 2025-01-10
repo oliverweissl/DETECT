@@ -3,7 +3,7 @@ from typing import Any, Optional
 import numpy as np
 
 from .._criterion import Criterion
-from .._default_arguments import DefaultArguments
+from .._criteria_arguments import CriteriaArguments
 
 
 class DynamicConfidenceBalance(Criterion):
@@ -22,7 +22,7 @@ class DynamicConfidenceBalance(Criterion):
         super().__init__(inverse=inverse)
         self._target_primary = target_primary
 
-    def evaluate(self, *, default_args: DefaultArguments, **_: Any) -> float:
+    def evaluate(self, *, default_args: CriteriaArguments, **_: Any) -> float:
         """
         Calculate the confidence balance of 2 confidence values.
 

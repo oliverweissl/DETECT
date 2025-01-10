@@ -13,7 +13,7 @@ from torch import Tensor, nn
 import wandb
 
 from ._experiment_config import ExperimentConfig
-from .criteria import DefaultArguments
+from .criteria import CriteriaArguments
 from .learner import Learner
 from .manipulator import CandidateList, MixCandidate, StyleMixer
 
@@ -194,7 +194,7 @@ class NeuralTester:
                 np.array(
                     [
                         criterion.evaluate(
-                            default_args=DefaultArguments(
+                            default_args=CriteriaArguments(
                                 i1=self._img_rgb,
                                 i2=Xp,
                                 c1=c1,
