@@ -6,11 +6,12 @@ import dnnlib
 from torch_utils.ops import upfirdn2d
 
 from ._mix_candidate import CandidateList
+from ._manipulator import Manipulator
 
 
-class StyleMixer:
+class StyleGANManipulator(Manipulator):
     """
-    A class geared towards style-mixing using style layers in a GAN.
+    A class geared towards style-mixing using style layers in a StlyeGAN.
 
     This class is heavily influenced by the Renderer class in the StyleGAN3 repo.
     """
@@ -28,6 +29,7 @@ class StyleMixer:
         device: torch.device,
         mix_dims: tuple[int, int],
         noise_mode: str = "random",
+        manipulation_mode: str = "interpolate",
     ):
         """
         Initialize the StyleMixer object.
@@ -36,15 +38,24 @@ class StyleMixer:
         :param device: The torch device to use (should be cuda).
         :param mix_dims: The w-dimensions to use for mixing (range index).
         :param noise_mode: The noise mode to be used for generation (const, random).
+        :raises ValueError: If `manipulation_mode` or `noise_mode` is not supported.
         """
+        if manipulation_mode in ["interpolate", "mix"]:
+            self._manipulation_mode = manipulation_mode
+        else:
+            raise ValueError(f"Unknown manipulation mode: {manipulation_mode}")
+
+        if noise_mode in ["random", "const"]:
+            self._noise_mode = noise_mode
+        else:
+            raise ValueError(f"Unknown noise mode: {noise_mode}")
+
         self._generator = generator
         self._device = device
         self._has_input_transform = hasattr(generator.synthesis, "input") and hasattr(
             generator.synthesis.input, "transform"
         )
-        self._noise_mode = noise_mode
 
-        self._pinned_bufs = {}
         self._mix_dims = torch.arange(
             *mix_dims, device=self._device
         )  # Dimensions of w -> we only want to mix style layers.

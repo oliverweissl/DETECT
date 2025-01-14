@@ -9,13 +9,15 @@ import pandas as pd
 import torch
 from numpy.typing import NDArray
 from torch import Tensor, nn
+from typing import Any
 
 import wandb
+from wandb import UsageError
 
 from ._experiment_config import ExperimentConfig
 from .criteria import CriteriaArguments
 from .learner import Learner
-from .manipulator import CandidateList, MixCandidate, StyleMixer
+from .manipulator import CandidateList, MixCandidate, StyleGANManipulator
 
 
 class NeuralTester:
@@ -24,7 +26,7 @@ class NeuralTester:
     """Used Components."""
     _predictor: nn.Module
     _generator: nn.Module
-    _mixer: StyleMixer
+    _mixer: StyleGANManipulator
     _learner: Learner
     _device: torch.device
     _softmax: nn.Module
@@ -61,7 +63,7 @@ class NeuralTester:
         self._predictor = config.predictor.to(device)
         self._generator = config.generator.to(device)
         self._learner = learner
-        self._mixer = StyleMixer(self._generator, device, config.mix_dim_range)
+        self._mixer = StyleGANManipulator(self._generator, device, config.mix_dim_range)
 
         self._num_w0 = num_w0
         self._num_ws = num_ws
@@ -96,8 +98,9 @@ class NeuralTester:
 
             wn_tensors, wn_images, wn_ys, wn_trials = self._generate_seeds(self._num_ws, second)
 
-            wandb.log({"base_image": wandb.Image(self._img_rgb, caption="Base Image")})
-            wandb.summary["w0_trials"], wandb.summary["wn_trials"] = w0_trials, wn_trials
+            self._maybe_log({"base_image": wandb.Image(self._img_rgb, caption="Base Image")})
+            self._maybe_summary("w0_trials", wn_trials)
+            self._maybe_summary("wn_trials", wn_trials)
 
             """
             Note that the w0s and ws' do not have to share a label, but for this implementation we do not control the labels separately.
@@ -124,10 +127,8 @@ class NeuralTester:
             logging.info(
                 f"\tBest candidate(s) have a fitness of: {', '.join([str(c.fitness) for c in self._learner.best_candidates])}"
             )
-            wandb.summary["expected_boundary"] = second.item()
-
-            wandb.log(
-                {
+            self._maybe_summary("expected_boundary", second.item())
+            wnb_results = {
                     "best_candidates": wandb.Table(
                         columns=[metric.name for metric in self._config.metrics]
                         + [f"Genome_{i}" for i in range(*self._config.mix_dim_range)]
@@ -144,7 +145,8 @@ class NeuralTester:
                         ],
                     ),
                 }
-            )
+            self._maybe_log(wnb_results)
+
             Xp, yp = self._learner.best_candidates[0].data
             results = [self._img_rgb.tolist(), w0_ys[0].tolist(), Xp.tolist(), yp, datetime.now()-exp_start]
             self._df.loc[len(self._df)] = results
@@ -219,9 +221,36 @@ class NeuralTester:
                 f"mean_{metric.name}": obj.mean(),
                 f"std_{metric.name}": obj.std(),
             }
-        wandb.log(results)
+        self._maybe_log(results)
 
         return images, fitness, predictions_softmax
+
+    @staticmethod
+    def _maybe_log(results: dict) -> None:
+        """
+        Logs to Wandb if initialized.
+
+        :param: The results to log.
+        """
+        try:
+            wandb.log(results)
+        except wandb.errors.Error as e:
+            logging.error(e)
+            pass
+
+    @staticmethod
+    def _maybe_summary(field: str, summary: Any) -> None:
+        """
+        Add elements to wandb Summary if initialized.
+
+        :param field: The field to add an element to.
+        :param summary: The element to add.
+        """
+        try:
+            wandb.summary[field] = summary
+        except wandb.errors.Error as e:
+            logging.error(e)
+            pass
 
     def _generate_seeds(
         self, amount: int, cls: int
@@ -245,7 +274,8 @@ class NeuralTester:
             # We generate w latent vector.
             w = self._mixer.get_w(self._get_time_seed(), cls)
             # We generate and transform the image to RGB if it is in Grayscale.
-            img = self._assure_rgb(self._mixer.get_image(w))
+            img = self._mixer.get_image(w)
+            img = self._assure_rgb(img)
             y_hat = self._predictor(img.unsqueeze(0))
 
             # We are only interested in candidate if the prediction matches the label
@@ -263,20 +293,24 @@ class NeuralTester:
         :param exp_start: The start of the experiment (for grouping purposes).
         :param class_idx: The class index to search boundary candidates for.
         """
-        wandb.init(
-            project="NeuralStyleSearch",
-            config={
-                "num_gen": self._config.generations,
-                "num_w0s": self._num_w0,
-                "num_wns": self._num_ws,
-                "mix_dims": self._config.mix_dim_range,
-                "pop_size": self._learner._x_current.shape[0],
-                "experiment_start": exp_start,
-                "label": class_idx,
-                "learner_type": self._learner.learner_type,
-            },
-            settings=wandb.Settings(silent=silent)
-        )
+        try:
+            wandb.init(
+                project="NeuralStyleSearch",
+                config={
+                    "num_gen": self._config.generations,
+                    "num_w0s": self._num_w0,
+                    "num_wns": self._num_ws,
+                    "mix_dims": self._config.mix_dim_range,
+                    "pop_size": self._learner._x_current.shape[0],
+                    "experiment_start": exp_start,
+                    "label": class_idx,
+                    "learner_type": self._learner.learner_type,
+                },
+                settings=wandb.Settings(silent=silent)
+            )
+        except UsageError as e:
+            logging.error(f"Raised error {e}, \n continuing...")
+            pass
 
     @staticmethod
     def _get_time_seed() -> int:
@@ -291,14 +325,23 @@ class NeuralTester:
     @staticmethod
     def _assure_rgb(image: Tensor) -> Tensor:
         """
-        For now we only convert Grayscale to RGB.
+        Assure that image is or can be converted to RGB.
 
         :param image: The image to be converted.
         :returns: The converted image (3 x H x W).
+        :raises: ValueError if the image shape is not recognized.
         """
-        if len(image.shape) == 4 and image.shape[1] == 1:
-            return image.repeat(1, 3, 1, 1)
-        elif len(image.shape) == 3 and image.shape[0] == 1:
-            return image.repeat(3, 1, 1)
-        elif len(image.shape) == 2:
-            return torch.unsqueeze(image, 0).repeat(3, 1, 1)
+        # We check if the input has a channel dimension.
+        channel = None if len(image.shape) == 2 else len(image.shape) - 3
+        # If we don`t have channels we add a dimension.
+        image = image.unsqueeze(0) if channel is None else image
+
+        rep_mask = [1]* len(image.shape)  # A repetition mask for channel extrusions
+        if image.shape[channel] == 1:
+            # If we only have one channel we repeat it 3 times to make it rgb.
+            rep_mask[channel] = 3
+            return image.repeat(*rep_mask)
+        elif image.shape[channel] == 3:
+            return image
+        else:
+            raise ValueError(f"Unknown image shape. {image.shape}")

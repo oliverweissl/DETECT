@@ -17,11 +17,11 @@ In the targeted case we want to find a perturbed input with a specific (secondar
 Note that generally this can be a discrete problem where we check, if misclassified. 
 But for optimization continuous problems produce better results, therefore we use confidence imbalance.
 """
-UNTARGETED_ADVESARIAL_TESTING = [
+UNTARGETED_ADVERSARIAL_TESTING = [
     CFrobeniusDistance(),
     DynamicConfidenceBalance(inverse=True, target_primary=False),
 ]
-TARGETED_ADVESARIAL_TESTING = [
+TARGETED_ADVERSARIAL_TESTING = [
     CFrobeniusDistance(),
     NaiveConfidenceBalance(inverse=True, target_primary=False),
 ]
@@ -35,6 +35,7 @@ Note that here we dont care about the distance of images, since the boundary can
 """
 UNTARGETED_BOUNDARY_TESTING = [DynamicConfidenceBalance()]
 TARGETED_BOUNDARY_TESTING = [NaiveConfidenceBalance()]
+ADVERSARIAL_BOUNDARY_TESTING = [NaiveConfidenceBalance(), CFrobeniusDistance()]
 
 """
 ### DIVERSITY SAMPLING:
