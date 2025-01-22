@@ -39,6 +39,7 @@ class PymooLearner(Learner):
         :param num_objectives: The number of objectives the learner can handle.
         """
         self._pymoo_algo = algorithm(**algo_params)
+        self._n_var = n_var
 
         self._bounds = lb, ub = bounds
         self._problem = Problem(n_var=n_var, n_obj=num_objectives, xl=lb, xu=ub, vtype=float)

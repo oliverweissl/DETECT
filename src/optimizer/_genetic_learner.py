@@ -37,6 +37,7 @@ class GeneticLearner(Learner):
         :param mutation_rate: The mutation rate.
         :param bounds: The bounds of the genome.
         """
+        self._n_var, *_ = x0.shape
         self._bounds = bounds
         self._x_current = x0
         self._population_size = population_size

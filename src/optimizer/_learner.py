@@ -19,6 +19,8 @@ class Learner(ABC):
     _num_objectives: int
     _bounds: tuple[int, int]
 
+    _n_var: int
+
     @abstractmethod
     def new_population(self) -> None:
         """
@@ -109,6 +111,15 @@ class Learner(ABC):
         :returns: The type.
         """
         return self._learner_type
+
+    @property
+    def n_var(self) -> int:
+        """
+        Get size of genome for optimizer.
+
+        :returns: The size of the genome.
+        """
+        return self._n_var
 
     def _normalize_to_bounds(self, element: NDArray) -> NDArray:
         """

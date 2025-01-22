@@ -20,6 +20,7 @@ class StyleGANManipulator(Manipulator):
     _device: torch.device
     _has_input_transform: bool
     _noise_mode: str
+    _interpolate: bool
 
     _mix_dims: Tensor  # Range for dimensions to mix styles with.
 
@@ -28,8 +29,8 @@ class StyleGANManipulator(Manipulator):
         generator: torch.nn.Module,
         device: torch.device,
         mix_dims: tuple[int, int],
+        interpolate: bool = True,
         noise_mode: str = "random",
-        manipulation_mode: str = "interpolate",
     ):
         """
         Initialize the StyleMixer object.
@@ -38,12 +39,10 @@ class StyleGANManipulator(Manipulator):
         :param device: The torch device to use (should be cuda).
         :param mix_dims: The w-dimensions to use for mixing (range index).
         :param noise_mode: The noise mode to be used for generation (const, random).
+        :param interpolate: Whether to interpolate style layers or mix.
         :raises ValueError: If `manipulation_mode` or `noise_mode` is not supported.
         """
-        if manipulation_mode in ["interpolate", "mix"]:
-            self._manipulation_mode = manipulation_mode
-        else:
-            raise ValueError(f"Unknown manipulation mode: {manipulation_mode}")
+        self._interpolate = interpolate
 
         if noise_mode in ["random", "const"]:
             self._noise_mode = noise_mode
@@ -60,25 +59,28 @@ class StyleGANManipulator(Manipulator):
             *mix_dims, device=self._device
         )  # Dimensions of w -> we only want to mix style layers.
 
-    def mix(
+    def manipulate(
         self,
         candidates: CandidateList,
-        sm_cond: list[int],
-        sm_weights: list[float],
+        cond: list[int],
+        weights: list[float],
         random_seed: int = 0,
     ) -> Tensor:
         """
-        Generate data using style mixing.
+        Generate data using style mixing or interpolation.
 
         This function is heavily inspired by the Renderer class of the original StyleGANv3 codebase.
 
         :param candidates: The candidates used for style-mixing.
-        :param sm_cond: The style mix conditions (layer combinations).
-        :param sm_weights: The weights for style mixing layers.
+        :param cond: The manipulation conditions (layer combinations).
+        :param weights: The weights for manipulating layers.
         :param random_seed: The seed for randomization.
         :returns: The generated image (C x H x W) as float with range [0, 255].
         """
-        assert len(sm_cond) == len(sm_weights), "Error: The parameters have to be of same length."
+        assert len(cond) == len(weights), "Error: The manipulation condition and weights have to be of same length."
+
+        if not self._interpolate:
+            weights = [int(e) for e in weights]
 
         if self._has_input_transform:
             m = np.eye(3)
@@ -98,11 +100,11 @@ class StyleGANManipulator(Manipulator):
 
         """Here we do style mixing."""
         w = torch.zeros_like(w0, device=self._device, dtype=torch.float32)  # Empty final-w vector
-        smw_tensor = torch.as_tensor(sm_weights, device=self._device)[:, None]  # |mix_dims| x 1
+        smw_tensor = torch.as_tensor(weights, device=self._device, dtype=torch.float32)[:, None]  # |mix_dims| x 1
         assert (lmd := len(self._mix_dims)) == (
-            lsmx := len(sm_cond)
+            lsmx := len(cond)
         ), f"Error SMX condition array is not the same size as the mix dimensions ({lmd} vs {lsmx}). This might be due to a mismatch in genome size."
-        comp1 = wn_tensors[sm_cond, self._mix_dims, :] * smw_tensor
+        comp1 = wn_tensors[cond, self._mix_dims, :] * smw_tensor
 
         w[:, self._mix_dims] += comp1 + w0[:, self._mix_dims] * (1 - smw_tensor)
         w += w_avg

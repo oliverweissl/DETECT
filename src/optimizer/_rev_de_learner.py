@@ -45,6 +45,7 @@ class RevDELearner(Learner):
         :param continuous: If genomes are continuous or not.
         """
         self._population_size = population_size
+        self._n_var, *_ = x0.shape
 
         self._bounds = bounds  # The bounds of genome values.
         self.F = f  # The scaling factor.

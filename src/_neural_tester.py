@@ -15,20 +15,19 @@ import wandb
 from wandb import UsageError
 
 from ._experiment_config import ExperimentConfig
-from .criteria import CriteriaArguments
-from .learner import Learner
-from .manipulator import CandidateList, MixCandidate, StyleGANManipulator
+from .criteria import CriteriaArguments, Criterion
+from .optimizer import Learner
+from .manipulator import CandidateList, MixCandidate, Manipulator
 
 
 class NeuralTester:
     """A tester class for DNN using latent space manipulation in generative models."""
 
     """Used Components."""
-    _predictor: nn.Module
-    _generator: nn.Module
-    _mixer: StyleGANManipulator
-    _learner: Learner
-    _device: torch.device
+    _sut: nn.Module  # The SUT
+    _manipulator: Manipulator
+    _optimizer: Learner
+
     _softmax: nn.Module
 
     """Additional Parameters."""
@@ -42,9 +41,11 @@ class NeuralTester:
     def __init__(
         self,
         *,
+        sut: nn.Module,
+        manipulator: Manipulator,
+        optimizer: Learner,
+        objectives: list[Criterion],
         config: ExperimentConfig,
-        learner: Learner,
-        device: torch.device,
         num_w0: int = 1,
         num_ws: int = 1,
         silent_wandb: bool = False,
@@ -53,24 +54,23 @@ class NeuralTester:
         Initialize the Neural Tester.
 
         :param config: The experiment configuration.
-        :param learner: The learner to find boundary candidates.
-        :param device: The device to use.
+        :param optimizer: The learner to find boundary candidates.
         :param num_w0: The number of w0 seeds to be generated.
         :param num_ws: The number of w seeds to be generated.
         :para silent_wandb: Whether to silence wandb.
         """
-        self._device = device
-        self._predictor = config.predictor.to(device)
-        self._generator = config.generator.to(device)
-        self._learner = learner
-        self._mixer = StyleGANManipulator(self._generator, device, config.mix_dim_range)
+
+        self._sut = sut
+        self._manipulator = manipulator
+        self._optimizer = optimizer
+        self._objectives = objectives
+
 
         self._num_w0 = num_w0
         self._num_ws = num_ws
 
         self._config = config
-        self._predictor.eval()
-        self._softmax = torch.nn.Softmax(dim=1)
+        self._softmax = torch.nn.Softmax(dim=1)  # TODO: should be refractored probably
 
         self._df = pd.DataFrame(columns=["X", "y", "Xp", "yp", "runtime"])
         self._silent = silent_wandb
@@ -118,20 +118,20 @@ class NeuralTester:
                 # We define the inner loop with its parameters.
                 images, fitness, preds = self._inner_loop(candidates, class_idx, second)
                 # Assign fitness to current population and additional data (in our case images).
-                self._learner.assign_fitness(fitness, images, preds.tolist())
-                self._learner.new_population()
+                self._optimizer.assign_fitness(fitness, images, preds.tolist())
+                self._optimizer.new_population()
             # Evaluate the last generation.
             images, fitness, preds = self._inner_loop(candidates, class_idx, second)
-            self._learner.assign_fitness(fitness, images, preds.tolist())
+            self._optimizer.assign_fitness(fitness, images, preds.tolist())
 
             logging.info(
-                f"\tBest candidate(s) have a fitness of: {', '.join([str(c.fitness) for c in self._learner.best_candidates])}"
+                f"\tBest candidate(s) have a fitness of: {', '.join([str(c.fitness) for c in self._optimizer.best_candidates])}"
             )
             self._maybe_summary("expected_boundary", second.item())
             wnb_results = {
                     "best_candidates": wandb.Table(
-                        columns=[metric.name for metric in self._config.metrics]
-                        + [f"Genome_{i}" for i in range(*self._config.mix_dim_range)]
+                        columns=[metric.name for metric in self._objectives]
+                        + [f"Genome_{i}" for i in range(self._optimizer.n_var)]
                         + ["Image"]
                         + [f"Conf_{i}" for i in range(self._config.classes)],
                         data=[
@@ -141,16 +141,16 @@ class NeuralTester:
                                 wandb.Image(c.data[0]),
                                 *c.data[1],
                             ]
-                            for c in self._learner.best_candidates
+                            for c in self._optimizer.best_candidates
                         ],
                     ),
                 }
             self._maybe_log(wnb_results)
 
-            Xp, yp = self._learner.best_candidates[0].data
+            Xp, yp = self._optimizer.best_candidates[0].data
             results = [self._img_rgb.tolist(), w0_ys[0].tolist(), Xp.tolist(), yp, datetime.now()-exp_start]
             self._df.loc[len(self._df)] = results
-            self._learner.reset()  # Reset the learner for new candidate.
+            self._optimizer.reset()  # Reset the learner for new candidate.
             logging.info("\tReset learner!")
 
         if self._config.save_to is not None:
@@ -171,17 +171,17 @@ class NeuralTester:
         :returns: The images generated, and the corresponding fitness and the softmax predictions.
         """
         # Get the initial population of style mixing conditions and weights
-        sm_cond_arr, sm_weights_arr = self._learner.get_x_current()
+        sm_cond_arr, sm_weights_arr = self._optimizer.get_x_current()
         assert (
             0 <= sm_cond_arr.max() < self._num_ws
         ), f"Error: StyleMixing Conditions reference indices of {sm_cond_arr.max()}, but we only have {self._num_ws} elements."
 
         images = []
         for sm_cond, sm_weights in zip(sm_cond_arr, sm_weights_arr):
-            mixed_image = self._mixer.mix(
+            mixed_image = self._manipulator.manipulate(
                 candidates=candidates,
-                sm_cond=sm_cond,
-                sm_weights=sm_weights,
+                cond=sm_cond,
+                weights=sm_weights,
                 random_seed=self._get_time_seed(),
             )
             images.append(mixed_image)
@@ -189,7 +189,7 @@ class NeuralTester:
         images = [self._assure_rgb(img) for img in images]
 
         """We predict the label from the mixed images."""
-        predictions: Tensor = self._predictor(torch.stack(images))
+        predictions: Tensor = self._sut(torch.stack(images))
         predictions_softmax = self._softmax(predictions)
         fitness = tuple(
             [
@@ -207,14 +207,14 @@ class NeuralTester:
                         for Xp, yp in zip(images, predictions_softmax)
                     ]
                 )
-                for criterion in self._config.metrics
+                for criterion in self._objectives
             ]
         )
 
         # Logging Operations
         results = {}
         # Log statistics for each objective function seperatly.
-        for metric, obj in zip(self._config.metrics, fitness):
+        for metric, obj in zip(self._objectives, fitness):
             results |= {
                 f"min_{metric.name}": obj.min(),
                 f"max_{metric.name}": obj.max(),
@@ -272,11 +272,11 @@ class NeuralTester:
         while len(ws) < amount:
             trials += 1
             # We generate w latent vector.
-            w = self._mixer.get_w(self._get_time_seed(), cls)
+            w = self._manipulator.get_w(self._get_time_seed(), cls)
             # We generate and transform the image to RGB if it is in Grayscale.
-            img = self._mixer.get_image(w)
+            img = self._manipulator.get_image(w)
             img = self._assure_rgb(img)
-            y_hat = self._predictor(img.unsqueeze(0))
+            y_hat = self._sut(img.unsqueeze(0))
 
             # We are only interested in candidate if the prediction matches the label
             if y_hat.argmax() == cls:
@@ -300,11 +300,10 @@ class NeuralTester:
                     "num_gen": self._config.generations,
                     "num_w0s": self._num_w0,
                     "num_wns": self._num_ws,
-                    "mix_dims": self._config.mix_dim_range,
-                    "pop_size": self._learner._x_current.shape[0],
+                    "pop_size": self._optimizer._x_current.shape[0],
                     "experiment_start": exp_start,
                     "label": class_idx,
-                    "learner_type": self._learner.learner_type,
+                    "learner_type": self._optimizer.learner_type,
                 },
                 settings=wandb.Settings(silent=silent)
             )
