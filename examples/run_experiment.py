@@ -7,7 +7,7 @@ import torch
 import wandb
 
 from src import NeuralTester, ExperimentConfig
-from src.learner import PymooLearner
+from src.optimizer import PymooLearner
 from src.defaults.learner_configs import PYMOO_AGE_MOEA_DEFAULT_PARAMS
 from src.defaults.objective_configs import (
     TARGETED_BOUNDARY_TESTING,
@@ -17,6 +17,7 @@ from src.defaults.objective_configs import (
     ADVERSARIAL_BOUNDARY_TESTING,
     DIVERSITY_SAMPLING,
 )
+from src.manipulator import StyleGANManipulator
 from models import load_stylegan
 
 
@@ -76,6 +77,7 @@ def main(*,
          generator: str,
          mix_dims: tuple[int, int],
          generations: int = 150,
+         interpolate: bool = True,
          ) -> None:
     """
     Run the experiments done in the paper.
@@ -86,6 +88,7 @@ def main(*,
     :param generator: The generator to generate test cases.
     :param mix_dims: The dimensions to mix in the generator.
     :param generations: The number of generations to run the optimization.
+    :param interpolate: Whether to interpolate the style layers.
     """
 
     # Define the configurations for our experiments.
@@ -93,30 +96,40 @@ def main(*,
     p = MODEL_COMBINATIONS[dataset][predictor]
     g = MODEL_COMBINATIONS[dataset][generator]
 
+    device = torch.device("cuda")
+
+    """Initialize components of the framework."""
+    sut = torch.load(p)
+    sut = sut.to(device)
+    sut.eval()
+
+    generator_model = load_stylegan(g)
+    generator_model = generator_model.to(device)
+    manipulator = StyleGANManipulator(generator_model, device, mix_dims, interpolate=interpolate)
+
+    optimizer_params = PYMOO_AGE_MOEA_DEFAULT_PARAMS
+    optimizer = PymooLearner(
+        **optimizer_params,
+        n_var=mix_dims[1] - mix_dims[0],
+        num_objectives=len(metrics),
+    )
+
+    """Make a config (used for logging and more)."""
     conf = ExperimentConfig(
         samples_per_class=10,
         generations=generations,
-        mix_dim_range=mix_dims,
-        predictor=torch.load(p),  # The System under test (SUT).
-        generator=load_stylegan(g),  # The generator network.
-        metrics=metrics,
         classes=10,
         save_to=f"results_lmt_{dataset}_{predictor}_{generator}_{objective}",
     )
 
-    learner_params = PYMOO_AGE_MOEA_DEFAULT_PARAMS
-    learner_params["n_var"] = conf.genome_size
-    learner_params["num_objectives"] = len(metrics)
-    learner = PymooLearner(
-        **learner_params
-    )  # The learner for search based optimization of candidates.
-
-    # Here we initialize the Tester object.
+    """Initialize the framework with all components."""
     tester = NeuralTester(
-        config=conf,
-        learner=learner,
-        device=torch.device("cuda"),
+        sut=sut,
+        manipulator=manipulator,
+        optimizer=optimizer,
+        objectives=metrics,
         silent_wandb=True,
+        config=conf,
     )
 
     # We start the testing procedure.
