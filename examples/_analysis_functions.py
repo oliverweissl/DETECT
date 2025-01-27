@@ -43,7 +43,8 @@ def load_and_combine_dfs(path: str, filters: list[str]) -> pd.DataFrame:
         raise FileNotFoundError(f"No dfs in directory {path}")
     combined_df = pd.DataFrame()
     for elem in all_dfs:
-        if all(kw in elem for kw in filters):
+        split_file = elem.split(".")[0].split("_")
+        if all(kw in split_file for kw in filters) and len(split_file) - len(filters) == 3:
             tmp_df = pd.read_csv(elem)
             combined_df = pd.concat([tmp_df, combined_df], ignore_index=True)
             cols = tmp_df.columns
@@ -79,6 +80,42 @@ def filter_for_classes(*elements: list[pd.Series], class_information: pd.Series,
     elements = [e[mask] for e in elements]
     elements = elements + [class_information[mask]] if filter_class_information else elements
     return elements
+
+def get_boundary_stats(y1:pd.Series, y2:pd.Series) -> tuple[float, float, float]:
+    """
+    Get boundary coverage measures based on Kolmogorov-Smirnov distance.
+
+    Get boundary vicinity.
+
+    :param y1: First series of confidence values.
+    :param y2: Second series of confidence values.
+    :returns: Mean boundary coverage across classes and std.
+    """
+    boundary_distribution = {i: [] for i in range(10)}
+    escaped_boundaries = {i: [] for i in range(10)}
+    esc = 0
+    for y, yp in zip(y1, y2):
+        yp = np.array(yp)
+        label = np.argmax(y)
+        boundary_location = yp.argsort()[-2:][::-1]
+        if label not in boundary_location:
+            escaped_boundaries[label].append(boundary_location)
+            esc += 1
+        else:
+            bl = list(boundary_location)
+            bl.remove(label)
+            boundary_distribution[label] += bl
+
+    unif = [1 / 9] * 9
+    distances = []
+    for label, dist in boundary_distribution.items():
+        hist, _ = np.histogram(dist, bins=10, range=(0, 10))
+        hist = np.delete(hist, label)
+        dist2 = hist / sum(hist)
+        cdf1, cdf2 = np.cumsum(unif), np.cumsum(dist2)
+        distances.append(np.max(np.abs(cdf1 - cdf2)))
+    distances = np.array(distances)
+    return distances.mean(), distances.std(), esc/len(y1)
 
 
 """Plotting Functions."""
@@ -168,3 +205,4 @@ def plot_manifold_analysis(
         for source, target in zip(emb_orig, emb_targets):
             ax.annotate("", target, source, arrowprops=dict(arrowstyle="->"))
     plt.show()
+

@@ -119,7 +119,7 @@ def main(*,
         samples_per_class=10,
         generations=generations,
         classes=10,
-        save_to=f"results_lmt_{dataset}_{predictor}_{generator}_{objective}",
+        save_to=f"results_lmt_{dataset}_{predictor}_{generator}_{objective}" + ("sm" if not interpolate else ""),
     )
 
     """Initialize the framework with all components."""

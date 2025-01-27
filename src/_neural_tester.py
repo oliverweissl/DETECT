@@ -5,7 +5,6 @@ from datetime import datetime
 from itertools import product
 
 import numpy as np
-import pandas as pd
 import torch
 from numpy.typing import NDArray
 from torch import Tensor, nn
@@ -15,6 +14,7 @@ import wandb
 from wandb import UsageError
 
 from ._experiment_config import ExperimentConfig
+from .persistence import DefaultDF
 from .criteria import CriteriaArguments, Criterion
 from .optimizer import Learner
 from .manipulator import CandidateList, MixCandidate, Manipulator
@@ -24,9 +24,10 @@ class NeuralTester:
     """A tester class for DNN using latent space manipulation in generative models."""
 
     """Used Components."""
-    _sut: nn.Module  # The SUT
+    _sut: nn.Module
     _manipulator: Manipulator
     _optimizer: Learner
+    _objectives: list[Criterion]
 
     _softmax: nn.Module
 
@@ -57,7 +58,7 @@ class NeuralTester:
         :param optimizer: The learner to find boundary candidates.
         :param num_w0: The number of w0 seeds to be generated.
         :param num_ws: The number of w seeds to be generated.
-        :para silent_wandb: Whether to silence wandb.
+        :param silent_wandb: Whether to silence wandb.
         """
 
         self._sut = sut
@@ -72,7 +73,7 @@ class NeuralTester:
         self._config = config
         self._softmax = torch.nn.Softmax(dim=1)  # TODO: should be refractored probably
 
-        self._df = pd.DataFrame(columns=["X", "y", "Xp", "yp", "runtime"])
+        self._df = DefaultDF()
         self._silent = silent_wandb
 
     def test(self):
@@ -149,7 +150,7 @@ class NeuralTester:
 
             Xp, yp = self._optimizer.best_candidates[0].data
             results = [self._img_rgb.tolist(), w0_ys[0].tolist(), Xp.tolist(), yp, datetime.now()-exp_start]
-            self._df.loc[len(self._df)] = results
+            self._df.append_row(results)
             self._optimizer.reset()  # Reset the learner for new candidate.
             logging.info("\tReset learner!")
 
