@@ -4,7 +4,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from ._learner import Learner
-from .auxiliary_components import LearnerCandidate
+from .auxiliary_components import OptimizerCandidate
 
 
 class GeneticLearner(Learner):
@@ -44,7 +44,7 @@ class GeneticLearner(Learner):
         self._mutation_rate = mutation_rate
 
         self._vec_mutate = np.vectorize(self._mutate)
-        self._best_candidates = [LearnerCandidate(x0[0], np.inf)]
+        self._best_candidates = [OptimizerCandidate(x0[0], np.inf)]
         self._learner_type = type(self)
         self._num_objectives = num_objectives
 

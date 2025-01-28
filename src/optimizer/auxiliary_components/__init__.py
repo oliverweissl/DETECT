@@ -1,5 +1,5 @@
 """Auxiliary components for the Learner objects."""
 
-from ._learner_candidate import LearnerCandidate
+from ._optimizer_candidate import OptimizerCandidate
 
-__all__ = ["LearnerCandidate"]
+__all__ = ["OptimizerCandidate"]

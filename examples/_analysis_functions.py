@@ -5,9 +5,12 @@ from ast import literal_eval
 import numpy as np
 from sklearn.manifold import TSNE
 from scipy.stats import gaussian_kde
+from scipy.sparse.csgraph import laplacian
 import torch
 from numpy.typing import NDArray
 from typing import Union, Any
+
+from src.criteria.image_comparison import CFrobeniusDistance
 
 
 def softmax(x: Union[list, NDArray]) -> NDArray:
@@ -44,7 +47,8 @@ def load_and_combine_dfs(path: str, filters: list[str]) -> pd.DataFrame:
     combined_df = pd.DataFrame()
     for elem in all_dfs:
         split_file = elem.split(".")[0].split("_")
-        if all(kw in split_file for kw in filters) and len(split_file) - len(filters) == 3:
+        res_size = 4 if "wrn" in split_file else 3
+        if all((kw in split_file for kw in filters)) and (len(split_file) - len(filters) == res_size):
             tmp_df = pd.read_csv(elem)
             combined_df = pd.concat([tmp_df, combined_df], ignore_index=True)
             cols = tmp_df.columns
@@ -81,7 +85,7 @@ def filter_for_classes(*elements: list[pd.Series], class_information: pd.Series,
     elements = elements + [class_information[mask]] if filter_class_information else elements
     return elements
 
-def get_boundary_stats(y1:pd.Series, y2:pd.Series) -> tuple[float, float, float]:
+def get_boundary_stats(y1:pd.Series, y2:pd.Series) -> tuple[NDArray, float]:
     """
     Get boundary coverage measures based on Kolmogorov-Smirnov distance.
 
@@ -97,7 +101,7 @@ def get_boundary_stats(y1:pd.Series, y2:pd.Series) -> tuple[float, float, float]
     for y, yp in zip(y1, y2):
         yp = np.array(yp)
         label = np.argmax(y)
-        boundary_location = yp.argsort()[-2:][::-1]
+        boundary_location = yp.argsort()[::-1][:2]
         if label not in boundary_location:
             escaped_boundaries[label].append(boundary_location)
             esc += 1
@@ -106,16 +110,53 @@ def get_boundary_stats(y1:pd.Series, y2:pd.Series) -> tuple[float, float, float]
             bl.remove(label)
             boundary_distribution[label] += bl
 
-    unif = [1 / 9] * 9
+    unif = np.full(9, 1/9)
     distances = []
     for label, dist in boundary_distribution.items():
         hist, _ = np.histogram(dist, bins=10, range=(0, 10))
         hist = np.delete(hist, label)
-        dist2 = hist / sum(hist)
-        cdf1, cdf2 = np.cumsum(unif), np.cumsum(dist2)
-        distances.append(np.max(np.abs(cdf1 - cdf2)))
+        hist = hist / 10
+
+        dist = 0 if hist.sum() == 0 else (2 * np.sum(np.minimum(unif, hist)) / 2) * hist.sum()
+
+        distances.append(dist)
     distances = np.array(distances)
-    return distances.mean(), distances.std(), esc/len(y1)
+    return distances, esc/len(y1)
+
+def laplacian_variance(arr: NDArray) -> float:
+    """
+    Calculate the laplacian variance.
+
+    :param arr: Array to calculate laplacian variance for.
+    :returns: The variance value.
+    """
+    arr = arr.squeeze()
+    if len(arr.shape) == 3:
+        arr = arr.sum(axis=np.argmin(arr.shape))
+
+    filtered = laplacian(arr)
+    return filtered.var()
+
+def reduce_dim(arr: NDArray) -> NDArray:
+    arr = arr.squeeze()
+    shape = arr.shape
+    if len(shape) == 3:
+        arr = arr.sum(axis=np.argmin(shape))/ min(shape)
+    return arr
+
+def format_cols(df: pd.DataFrame) -> None:
+    for c in df.columns:
+        if "X" in c:
+            df[c] = df[c].apply(lambda x: reduce_dim(np.array(literal_eval(x))))
+        if "y" in c:
+            df[c] = df[c].apply(lambda x: np.array(literal_eval(x)))
+
+def distance_to_boundary(arr: NDArray) -> float:
+    arr = arr.squeeze()
+    boundary_indices = np.argsort(arr)[::-1][:2]
+    ideal = np.zeros_like(arr)
+    ideal[boundary_indices] = 0.5
+    return np.linalg.norm(ideal-arr)
 
 
 """Plotting Functions."""
@@ -205,4 +246,24 @@ def plot_manifold_analysis(
         for source, target in zip(emb_orig, emb_targets):
             ax.annotate("", target, source, arrowprops=dict(arrowstyle="->"))
     plt.show()
+
+def plot_measures(exps: list[str], dfs:list[list[pd.DataFrame]]) -> None:
+    num_methods = len(dfs)
+
+    for i, exp in enumerate(exps):
+        target_dfs = [df[i] for df in dfs]
+
+        image_dists = []
+        boundary_dists = []
+        for df in target_dfs:
+            format_cols(df)
+            x = df["X"]
+            xps_cols = [c for c in df.columns if ("X" in c) and ("p" in c)]
+            res = pd.Series(0, index=x.index)
+            for c in xps_cols:
+                res += x-df[c].apply(CFrobeniusDistance._frob)
+            res /= len(xps_cols)
+            image_dists.append(res)
+    pass
+
 

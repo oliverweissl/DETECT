@@ -44,3 +44,10 @@ Diversity testing aims to find inputs that are dissimilar to the provided data, 
 Here we want to find inputs that are classified correctly but have a high distance to the initial input.
 """
 DIVERSITY_SAMPLING = [CFrobeniusDistance(inverse=True), IsMisclassified()]
+
+
+"""
+### Validity Boundary Testing.
+Here we want to find the boundary to the validity domain in the classifier. As this is not formalizable we approximate it here.
+"""
+VALIDITY_BOUNDARY_TESTING = []

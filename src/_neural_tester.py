@@ -47,6 +47,7 @@ class NeuralTester:
         optimizer: Learner,
         objectives: list[Criterion],
         config: ExperimentConfig,
+        frontier_pairs: bool,
         num_w0: int = 1,
         num_ws: int = 1,
         silent_wandb: bool = False,
@@ -54,10 +55,14 @@ class NeuralTester:
         """
         Initialize the Neural Tester.
 
-        :param config: The experiment configuration.
-        :param optimizer: The learner to find boundary candidates.
-        :param num_w0: The number of w0 seeds to be generated.
-        :param num_ws: The number of w seeds to be generated.
+        :param sut: The system under test.
+        :param manipulator: The manipulator object.
+        :param optimizer: The optimizer object.
+        :param objectives: The objectives list.
+        :param config: The experiment config.
+        :param frontier_pairs: Whether the frontier pairs should be searched for.
+        :param num_w0: The number of primary seeds.
+        :param num_ws: The number of target seeds.
         :param silent_wandb: Whether to silence wandb.
         """
 
@@ -73,11 +78,15 @@ class NeuralTester:
         self._config = config
         self._softmax = torch.nn.Softmax(dim=1)  # TODO: should be refractored probably
 
-        self._df = DefaultDF()
+        self._df = DefaultDF(pairs=frontier_pairs)
         self._silent = silent_wandb
 
-    def test(self):
-        """Testing the predictor for its decision boundary using a set of (test!) Inputs."""
+    def test(self, validity_domain: bool = False) -> None:
+        """
+        Testing the predictor for its decision boundary using a set of (test!) Inputs.
+
+        :param validity_domain: Whether the validity domain should be tested for.
+        """
         spc, nc = self._config.samples_per_class, self._config.classes
 
         logging.info(
@@ -97,7 +106,7 @@ class NeuralTester:
             _, second, *_ = torch.argsort(w0_ys[0], descending=True)[0]
             self._img_rgb = w0_images[0]
 
-            wn_tensors, wn_images, wn_ys, wn_trials = self._generate_seeds(self._num_ws, second)
+            wn_tensors, wn_images, wn_ys, wn_trials = self._generate_noise(self._num_ws) if validity_domain else self._generate_seeds(self._num_ws, second)
 
             self._maybe_log({"base_image": wandb.Image(self._img_rgb, caption="Base Image")})
             self._maybe_summary("w0_trials", wn_trials)
@@ -286,6 +295,25 @@ class NeuralTester:
                 y_hats.append(y_hat)
         logging.info(f"\tFound {amount} valid seed(s) after: {trials} iterations.")
         return ws, imgs, y_hats, trials
+
+    def _generate_noise(
+        self, amount: int
+    ) -> tuple[list[Tensor], list[Tensor], list[Tensor], int]:
+        """
+        Generate noise.
+
+        :param amount: The amount of seeds to be generated.
+        :returns: The w vectors generated, the corresponding images, confidence values and the amount of trials needed.
+        """
+        logging.info(f"Generate noise seeds.")
+        # For logging purposes to see how many samples we need to find valid seed.
+        w: Tensor = self._manipulator.get_w(self._get_time_seed(), 0)
+        ws = [torch.randn(w.size()) for _ in range(amount)]
+        imgs = [self._assure_rgb(self._manipulator.get_image(w)) for w in ws]
+        y_hats = [self._sut(img.unsqueeze(0)) for img in imgs]
+
+        logging.info(f"\tFound {amount} valid seed(s).")
+        return ws, imgs, y_hats, 0
 
     def _init_wandb(self, exp_start: datetime, class_idx: int, silent: bool) -> None:
         """

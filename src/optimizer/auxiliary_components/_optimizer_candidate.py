@@ -6,15 +6,15 @@ from numpy.typing import NDArray
 
 
 @dataclass
-class LearnerCandidate:
-    """A candidate solution found by the learner."""
+class OptimizerCandidate:
+    """A candidate solution found by the optimizer."""
 
     solution: Optional[NDArray]
     fitness: Union[tuple[float, ...], float, list[float]]
 
     # Additional data that might be used.
     data: Optional[Any] = field(default=None)
-    parents: Optional[list[LearnerCandidate]] = field(default=None)
+    parents: Optional[list[OptimizerCandidate]] = field(default=None)
 
     def __post_init__(self) -> None:
         """Post init processing of data."""

@@ -4,14 +4,15 @@ from typing import Any, Iterable, Optional, Type, Union
 import numpy as np
 from numpy.typing import NDArray
 
-from .auxiliary_components import LearnerCandidate
+from .auxiliary_components import OptimizerCandidate
 
 
 class Learner(ABC):
     """An abstract learner class."""
 
     # Standard elements.
-    _best_candidates: list[LearnerCandidate]
+    _best_candidates: list[OptimizerCandidate]
+    _previous_best: list[OptimizerCandidate]
     _x_current: NDArray
     _fitness: tuple[NDArray, ...]
 
@@ -82,7 +83,8 @@ class Learner(ABC):
 
         candidates = []
         for index in sorted_indices:
-            candidates.append(LearnerCandidate(solutions[index], metrics[index], data[index]))
+            candidates.append(OptimizerCandidate(solution=solutions[index], fitness=metrics[index], data=data[index]))
+        self._previous_best = self._best_candidates
         self._best_candidates = candidates
 
     def reset(self) -> None:
@@ -91,17 +93,27 @@ class Learner(ABC):
             low=self._bounds[0], high=self._bounds[1], size=self._x_current.shape
         )
         self._best_candidates = [
-            LearnerCandidate(self._x_current[0], [np.inf] * self._num_objectives)
+            OptimizerCandidate(self._x_current[0], [np.inf] * self._num_objectives)
         ]
+        self._previous_best = self._best_candidates.copy()
 
     @property
-    def best_candidates(self) -> list[LearnerCandidate]:
+    def best_candidates(self) -> list[OptimizerCandidate]:
         """
         Get the best candidates so far (if more than one it is a pareto frontier).
 
         :return: The candidate.
         """
         return self._best_candidates
+
+    @property
+    def previous_best(self) -> list[OptimizerCandidate]:
+        """
+        Get the previously best candidates.
+
+        :return: The candidate.
+        """
+        return self._previous_best
 
     @property
     def learner_type(self) -> Type:

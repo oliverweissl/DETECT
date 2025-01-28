@@ -10,7 +10,7 @@ from pymoo.core.termination import NoTermination
 from pymoo.problems.static import StaticProblem
 
 from ._learner import Learner
-from .auxiliary_components import LearnerCandidate
+from .auxiliary_components import OptimizerCandidate
 
 
 class PymooLearner(Learner):
@@ -38,7 +38,7 @@ class PymooLearner(Learner):
         :param algo_params: Parameters for the pymoo Algorithm.
         :param num_objectives: The number of objectives the learner can handle.
         """
-        self._pymoo_algo = algorithm(**algo_params)
+        self._pymoo_algo = algorithm(**algo_params, save_history=True)
         self._n_var = n_var
 
         self._bounds = lb, ub = bounds
@@ -49,10 +49,12 @@ class PymooLearner(Learner):
         self._x_current = self._normalize_to_bounds(self._pop_current.get("X"))
 
         self._best_candidates = [
-            LearnerCandidate(
-                np.random.uniform(high=ub, low=lb, size=n_var), [np.inf] * num_objectives
+            OptimizerCandidate(
+                solution=np.random.uniform(high=ub, low=lb, size=n_var), fitness=[np.inf] * num_objectives
             )
         ]
+        self._previous_best = self._best_candidates.copy()
+
         self._learner_type = type(self._pymoo_algo)
         self._num_objectives = num_objectives
 

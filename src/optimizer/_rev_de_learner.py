@@ -4,7 +4,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from ._learner import Learner
-from .auxiliary_components import LearnerCandidate
+from .auxiliary_components import OptimizerCandidate
 
 
 class RevDELearner(Learner):
@@ -53,7 +53,7 @@ class RevDELearner(Learner):
         self._continuous = continuous
 
         self._x_current = x0  # pop_size x genome size
-        self._best_candidates = [LearnerCandidate(x0[0], np.inf)]
+        self._best_candidates = [OptimizerCandidate(x0[0], np.inf)]
         self._learner_type = type(self)
         self._num_objectives = num_objectives
 

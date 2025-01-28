@@ -1,17 +1,23 @@
 import sqlite3
 from numpy.typing import NDArray
-from pymoo.core.individual import Individual
+from typing import Optional
+import os.path
 
 
 class PopulationDB:
     """Database class for population based experiments."""
-    def __init__(self, path: str, num_parents: int=2) -> None:
+    def __init__(self, path: str, num_parents: int=2, overwrite: bool = False) -> None:
         """
         Initialise the experiment database.
 
         :param path: Path to the database file.
         :param num_parents: Number of parents.
+        :param overwrite: Whether to overwrite existing data.
+        :raises FileExistsError: If file already exists.
         """
+        if not overwrite and os.path.isfile(path):
+            raise FileExistsError(f"File {path} already exists.")
+
         self.conn = sqlite3.connect(path)
         self.cursor = self.conn.cursor()
         self._num_parents = num_parents
@@ -19,18 +25,17 @@ class PopulationDB:
         """Create table for indiviudals in the experiment."""
         parent_fields, parent_references = "", ""
         for i in range(num_parents):
-            parent_fields += f"parent_{i} INTEGER,"
-            parent_references += f"FOREIGN_KEY parent_{i} REFERENCES individuals (id),"
-
+            parent_fields += f"parent_{i} INTEGER, "
         self.cursor.execute(
             f"""
             CREATE TABLE IF NOT EXISTS individuals (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            generation INTEGER NOT NULL,
+            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            generation INTEGER NOT NULL, 
             fitness TEXT NOT NULL,
-            {parent_fields}{parent_references})
+            {parent_fields[:-2]})
             """
         )
+     
 
         """Create table for genomes."""
         self.cursor.execute(
@@ -38,8 +43,7 @@ class PopulationDB:
             CREATE TABLE IF NOT EXISTS genome (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             individual_id INTEGER NOT NULL,
-            genome TEXT NOT NULL,
-            FOREIGN KEY (individual_id) REFERENCES individuals (id))
+            genome TEXT NOT NULL)
             """
         )
 
@@ -49,8 +53,7 @@ class PopulationDB:
             CREATE TABLE IF NOT EXISTS solution (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             individual_id INTEGER NOT NULL,
-            solution TEXT NOT NULL,
-            FOREIGN KEY (individual_id) REFERENCES individuals (id))
+            solution TEXT NOT NULL)
             """
         )
 
@@ -60,7 +63,7 @@ class PopulationDB:
             fitness: tuple[float, ...],
             genome: NDArray,
             solution: NDArray,
-            parents: tuple[int, ...]
+            parents: Optional[tuple[int, ...]] = None
     ) -> None:
         """
         Add an individual to the database.
@@ -71,13 +74,14 @@ class PopulationDB:
         :param solution: Expression of the genome.
         :param parents: The parents ids.
         """
+        parents = [-1,] * self._num_parents if parents is None else parents
 
         # Insert individual
         parent_cols = ",".join([f'parent_{i}' for i in range(self._num_parents)])
         qs = ",".join(["?",]*self._num_parents)
         self.cursor.execute(
             f"""INSERT INTO individuals (generation, fitness, {parent_cols}) VALUES (?, ?, {qs})""",
-            (generation, fitness, *parents)
+            (generation, repr(fitness), *parents)
         )
         self.conn.commit()
         curr_id = self.cursor.lastrowid
@@ -85,14 +89,14 @@ class PopulationDB:
         # Insert genome
         self.cursor.execute(
             """INSERT INTO genome (individual_id, genome) VALUES (?,?)""",
-            (curr_id, genome)
+            (curr_id, repr(genome))
         )
         self.conn.commit()
 
         # Insert solution
         self.cursor.execute(
             """INSERT INTO solution (individual_id, solution) VALUES (?, ?)""",
-            (curr_id, solution)
+            (curr_id, repr(solution))
         )
         self.conn.commit()
 

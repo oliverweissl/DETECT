@@ -78,6 +78,7 @@ def main(*,
          mix_dims: tuple[int, int],
          generations: int = 150,
          interpolate: bool = True,
+         frontier_pairs: bool = False,
          ) -> None:
     """
     Run the experiments done in the paper.
@@ -89,6 +90,7 @@ def main(*,
     :param mix_dims: The dimensions to mix in the generator.
     :param generations: The number of generations to run the optimization.
     :param interpolate: Whether to interpolate the style layers.
+    :param frontier_pairs: Whether to use the frontier pairs.
     """
 
     # Define the configurations for our experiments.
@@ -128,12 +130,13 @@ def main(*,
         manipulator=manipulator,
         optimizer=optimizer,
         objectives=metrics,
+        frontier_pairs=frontier_pairs,
         silent_wandb=True,
         config=conf,
     )
 
     # We start the testing procedure.
-    tester.test()
+    tester.test(validity_domain=validity_domain)
 
 
 def _int_tuple(s: str) -> tuple[int, ...]:
