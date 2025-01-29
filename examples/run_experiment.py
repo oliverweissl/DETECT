@@ -20,7 +20,6 @@ from src.defaults.objective_configs import (
     DIVERSITY_SAMPLING,
 )
 from src.manipulator import StyleGANManipulator
-from models import load_stylegan
 
 """Some dicts to easily associate elements to arguments."""
 OBJECTIVES = {
@@ -107,9 +106,7 @@ def main(
     sut = sut.to(device)
     sut.eval()
 
-    generator_model = load_stylegan(g)
-    generator_model = generator_model.to(device)
-    manipulator = StyleGANManipulator(generator_model, device, mix_dims, interpolate=interpolate)
+    manipulator = StyleGANManipulator(g, device, mix_dims, interpolate=interpolate)
 
     optimizer_params = PYMOO_AGE_MOEA_DEFAULT_PARAMS
     optimizer = PymooLearner(
