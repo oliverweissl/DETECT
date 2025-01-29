@@ -83,7 +83,11 @@ class Learner(ABC):
 
         candidates = []
         for index in sorted_indices:
-            candidates.append(OptimizerCandidate(solution=solutions[index], fitness=metrics[index], data=data[index]))
+            candidates.append(
+                OptimizerCandidate(
+                    solution=solutions[index], fitness=metrics[index], data=data[index]
+                )
+            )
         self._previous_best = self._best_candidates
         self._best_candidates = candidates
 

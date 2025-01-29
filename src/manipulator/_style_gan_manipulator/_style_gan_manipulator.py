@@ -1,12 +1,14 @@
+from typing import Union
+
+import dnnlib
 import numpy as np
 import torch
 from torch import Tensor
-
-import dnnlib
 from torch_utils.ops import upfirdn2d
 
-from ._mix_candidate import CandidateList
-from ._manipulator import Manipulator
+from .._manipulator import Manipulator
+from .._mix_candidate import CandidateList
+from ._load_stylegan import load_stylegan
 
 
 class StyleGANManipulator(Manipulator):
@@ -26,7 +28,7 @@ class StyleGANManipulator(Manipulator):
 
     def __init__(
         self,
-        generator: torch.nn.Module,
+        generator: Union[torch.nn.Module, str],
         device: torch.device,
         mix_dims: tuple[int, int],
         interpolate: bool = True,
@@ -35,7 +37,7 @@ class StyleGANManipulator(Manipulator):
         """
         Initialize the StyleMixer object.
 
-        :param generator: The generator network to use.
+        :param generator: The generator network to use or the path to its pickle file.
         :param device: The torch device to use (should be cuda).
         :param mix_dims: The w-dimensions to use for mixing (range index).
         :param noise_mode: The noise mode to be used for generation (const, random).
@@ -49,8 +51,11 @@ class StyleGANManipulator(Manipulator):
         else:
             raise ValueError(f"Unknown noise mode: {noise_mode}")
 
-        self._generator = generator
+        self._generator = (
+            generator if isinstance(generator, torch.nn.Module) else load_stylegan(generator)
+        )
         self._device = device
+        self._generator.to(self._device)
         self._has_input_transform = hasattr(generator.synthesis, "input") and hasattr(
             generator.synthesis.input, "transform"
         )
@@ -77,7 +82,9 @@ class StyleGANManipulator(Manipulator):
         :param random_seed: The seed for randomization.
         :returns: The generated image (C x H x W) as float with range [0, 255].
         """
-        assert len(cond) == len(weights), "Error: The manipulation condition and weights have to be of same length."
+        assert len(cond) == len(
+            weights
+        ), "Error: The manipulation condition and weights have to be of same length."
 
         if not self._interpolate:
             weights = [int(e) for e in weights]
@@ -100,7 +107,9 @@ class StyleGANManipulator(Manipulator):
 
         """Here we do style mixing."""
         w = torch.zeros_like(w0, device=self._device, dtype=torch.float32)  # Empty final-w vector
-        smw_tensor = torch.as_tensor(weights, device=self._device, dtype=torch.float32)[:, None]  # |mix_dims| x 1
+        smw_tensor = torch.as_tensor(weights, device=self._device, dtype=torch.float32)[
+            :, None
+        ]  # |mix_dims| x 1
         assert (lmd := len(self._mix_dims)) == (
             lsmx := len(cond)
         ), f"Error SMX condition array is not the same size as the mix dimensions ({lmd} vs {lsmx}). This might be due to a mismatch in genome size."

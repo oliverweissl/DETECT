@@ -7,14 +7,13 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 import os
-import numpy as np
-import torch
 import warnings
 
-from .. import custom_ops
-from .. import misc
-from . import upfirdn2d
-from . import bias_act
+import numpy as np
+import torch
+
+from .. import custom_ops, misc
+from . import bias_act, upfirdn2d
 
 # ----------------------------------------------------------------------------
 

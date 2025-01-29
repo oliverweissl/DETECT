@@ -1,7 +1,9 @@
 """Copy this file to the root directory of the repository to run."""
+
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import argparse
 import torch
 import wandb
@@ -19,7 +21,6 @@ from src.defaults.objective_configs import (
 )
 from src.manipulator import StyleGANManipulator
 from models import load_stylegan
-
 
 """Some dicts to easily associate elements to arguments."""
 OBJECTIVES = {
@@ -70,16 +71,17 @@ MODEL_COMBINATIONS = {
 }
 
 
-def main(*,
-         objective: str,
-         dataset: str,
-         predictor: str,
-         generator: str,
-         mix_dims: tuple[int, int],
-         generations: int = 150,
-         interpolate: bool = True,
-         frontier_pairs: bool = False,
-         ) -> None:
+def main(
+    *,
+    objective: str,
+    dataset: str,
+    predictor: str,
+    generator: str,
+    mix_dims: tuple[int, int],
+    generations: int = 150,
+    interpolate: bool = True,
+    frontier_pairs: bool = False,
+) -> None:
     """
     Run the experiments done in the paper.
 
@@ -121,7 +123,8 @@ def main(*,
         samples_per_class=10,
         generations=generations,
         classes=10,
-        save_to=f"results_lmt_{dataset}_{predictor}_{generator}_{objective}" + ("sm" if not interpolate else ""),
+        save_to=f"results_lmt_{dataset}_{predictor}_{generator}_{objective}"
+        + ("sm" if not interpolate else ""),
     )
 
     """Initialize the framework with all components."""

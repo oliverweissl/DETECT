@@ -2,8 +2,8 @@ from typing import Any, Optional
 
 import numpy as np
 
-from .._criterion import Criterion
 from .._criteria_arguments import CriteriaArguments
+from .._criterion import Criterion
 
 
 class DynamicConfidenceBalance(Criterion):
@@ -40,7 +40,5 @@ class DynamicConfidenceBalance(Criterion):
             return abs(self._inverse.real - d / s)
         else:
             return abs(
-                self._inverse.imag
-                - (y.max() if self._target_primary else default_args.y1p)
-                - d / s
+                self._inverse.imag - (y.max() if self._target_primary else default_args.y1p) - d / s
             )

@@ -3,7 +3,7 @@
 from ._c_frobenius_distance import CFrobeniusDistance
 from ._cos_dissimilarity import CosDissimilarity
 from ._ms_ssim import MSSSIM
-from ._uqi import UQI
 from ._ssim_d2 import SSIMD2
+from ._uqi import UQI
 
 __all__ = ["SSIMD2", "MSSSIM", "UQI", "CosDissimilarity", "CFrobeniusDistance"]

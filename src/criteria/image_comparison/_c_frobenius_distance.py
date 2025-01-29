@@ -3,8 +3,8 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from .._criterion import Criterion
 from .._criteria_arguments import CriteriaArguments
+from .._criterion import Criterion
 from ._prepare_tensor import prepare_tensor
 
 

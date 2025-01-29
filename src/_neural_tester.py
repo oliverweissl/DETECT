@@ -3,21 +3,20 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from itertools import product
+from typing import Any
 
 import numpy as np
 import torch
+import wandb
 from numpy.typing import NDArray
 from torch import Tensor, nn
-from typing import Any
-
-import wandb
 from wandb import UsageError
 
 from ._experiment_config import ExperimentConfig
-from .persistence import DefaultDF
 from .criteria import CriteriaArguments, Criterion
+from .manipulator import CandidateList, Manipulator, MixCandidate
 from .optimizer import Learner
-from .manipulator import CandidateList, MixCandidate, Manipulator
+from .persistence import DefaultDF
 
 
 class NeuralTester:
@@ -71,7 +70,6 @@ class NeuralTester:
         self._optimizer = optimizer
         self._objectives = objectives
 
-
         self._num_w0 = num_w0
         self._num_ws = num_ws
 
@@ -106,7 +104,11 @@ class NeuralTester:
             _, second, *_ = torch.argsort(w0_ys[0], descending=True)[0]
             self._img_rgb = w0_images[0]
 
-            wn_tensors, wn_images, wn_ys, wn_trials = self._generate_noise(self._num_ws) if validity_domain else self._generate_seeds(self._num_ws, second)
+            wn_tensors, wn_images, wn_ys, wn_trials = (
+                self._generate_noise(self._num_ws)
+                if validity_domain
+                else self._generate_seeds(self._num_ws, second)
+            )
 
             self._maybe_log({"base_image": wandb.Image(self._img_rgb, caption="Base Image")})
             self._maybe_summary("w0_trials", wn_trials)
@@ -139,26 +141,32 @@ class NeuralTester:
             )
             self._maybe_summary("expected_boundary", second.item())
             wnb_results = {
-                    "best_candidates": wandb.Table(
-                        columns=[metric.name for metric in self._objectives]
-                        + [f"Genome_{i}" for i in range(self._optimizer.n_var)]
-                        + ["Image"]
-                        + [f"Conf_{i}" for i in range(self._config.classes)],
-                        data=[
-                            [
-                                *c.fitness,
-                                *c.solution,
-                                wandb.Image(c.data[0]),
-                                *c.data[1],
-                            ]
-                            for c in self._optimizer.best_candidates
-                        ],
-                    ),
-                }
+                "best_candidates": wandb.Table(
+                    columns=[metric.name for metric in self._objectives]
+                    + [f"Genome_{i}" for i in range(self._optimizer.n_var)]
+                    + ["Image"]
+                    + [f"Conf_{i}" for i in range(self._config.classes)],
+                    data=[
+                        [
+                            *c.fitness,
+                            *c.solution,
+                            wandb.Image(c.data[0]),
+                            *c.data[1],
+                        ]
+                        for c in self._optimizer.best_candidates
+                    ],
+                ),
+            }
             self._maybe_log(wnb_results)
 
             Xp, yp = self._optimizer.best_candidates[0].data
-            results = [self._img_rgb.tolist(), w0_ys[0].tolist(), Xp.tolist(), yp, datetime.now()-exp_start]
+            results = [
+                self._img_rgb.tolist(),
+                w0_ys[0].tolist(),
+                Xp.tolist(),
+                yp,
+                datetime.now() - exp_start,
+            ]
             self._df.append_row(results)
             self._optimizer.reset()  # Reset the learner for new candidate.
             logging.info("\tReset learner!")
@@ -240,7 +248,7 @@ class NeuralTester:
         """
         Logs to Wandb if initialized.
 
-        :param: The results to log.
+        :param results: The results to log.
         """
         try:
             wandb.log(results)
@@ -296,16 +304,14 @@ class NeuralTester:
         logging.info(f"\tFound {amount} valid seed(s) after: {trials} iterations.")
         return ws, imgs, y_hats, trials
 
-    def _generate_noise(
-        self, amount: int
-    ) -> tuple[list[Tensor], list[Tensor], list[Tensor], int]:
+    def _generate_noise(self, amount: int) -> tuple[list[Tensor], list[Tensor], list[Tensor], int]:
         """
         Generate noise.
 
         :param amount: The amount of seeds to be generated.
         :returns: The w vectors generated, the corresponding images, confidence values and the amount of trials needed.
         """
-        logging.info(f"Generate noise seeds.")
+        logging.info("Generate noise seeds.")
         # For logging purposes to see how many samples we need to find valid seed.
         w: Tensor = self._manipulator.get_w(self._get_time_seed(), 0)
         ws = [torch.randn(w.size()) for _ in range(amount)]
@@ -321,6 +327,7 @@ class NeuralTester:
 
         :param exp_start: The start of the experiment (for grouping purposes).
         :param class_idx: The class index to search boundary candidates for.
+        :param silent: Whether wandb should be silenced.
         """
         try:
             wandb.init(
@@ -334,7 +341,7 @@ class NeuralTester:
                     "label": class_idx,
                     "learner_type": self._optimizer.learner_type,
                 },
-                settings=wandb.Settings(silent=silent)
+                settings=wandb.Settings(silent=silent),
             )
         except UsageError as e:
             logging.error(f"Raised error {e}, \n continuing...")
@@ -357,14 +364,14 @@ class NeuralTester:
 
         :param image: The image to be converted.
         :returns: The converted image (3 x H x W).
-        :raises: ValueError if the image shape is not recognized.
+        :raises ValueError: If the image shape is not recognized.
         """
         # We check if the input has a channel dimension.
         channel = None if len(image.shape) == 2 else len(image.shape) - 3
         # If we don`t have channels we add a dimension.
         image = image.unsqueeze(0) if channel is None else image
 
-        rep_mask = [1]* len(image.shape)  # A repetition mask for channel extrusions
+        rep_mask = [1] * len(image.shape)  # A repetition mask for channel extrusions
         if image.shape[channel] == 1:
             # If we only have one channel we repeat it 3 times to make it rgb.
             rep_mask[channel] = 3

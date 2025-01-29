@@ -1,12 +1,14 @@
-import sqlite3
-from numpy.typing import NDArray
-from typing import Optional
 import os.path
+import sqlite3
+from typing import Optional
+
+from numpy.typing import NDArray
 
 
 class PopulationDB:
     """Database class for population based experiments."""
-    def __init__(self, path: str, num_parents: int=2, overwrite: bool = False) -> None:
+
+    def __init__(self, path: str, num_parents: int = 2, overwrite: bool = False) -> None:
         """
         Initialise the experiment database.
 
@@ -23,7 +25,7 @@ class PopulationDB:
         self._num_parents = num_parents
 
         """Create table for indiviudals in the experiment."""
-        parent_fields, parent_references = "", ""
+        parent_fields = ""
         for i in range(num_parents):
             parent_fields += f"parent_{i} INTEGER, "
         self.cursor.execute(
@@ -35,7 +37,6 @@ class PopulationDB:
             {parent_fields[:-2]})
             """
         )
-     
 
         """Create table for genomes."""
         self.cursor.execute(
@@ -58,12 +59,12 @@ class PopulationDB:
         )
 
     def add_individual(
-            self,
-            generation: int,
-            fitness: tuple[float, ...],
-            genome: NDArray,
-            solution: NDArray,
-            parents: Optional[tuple[int, ...]] = None
+        self,
+        generation: int,
+        fitness: tuple[float, ...],
+        genome: NDArray,
+        solution: NDArray,
+        parents: Optional[tuple[int, ...]] = None,
     ) -> None:
         """
         Add an individual to the database.
@@ -74,29 +75,40 @@ class PopulationDB:
         :param solution: Expression of the genome.
         :param parents: The parents ids.
         """
-        parents = [-1,] * self._num_parents if parents is None else parents
+        parents = (
+            [
+                -1,
+            ]
+            * self._num_parents
+            if parents is None
+            else parents
+        )
 
         # Insert individual
-        parent_cols = ",".join([f'parent_{i}' for i in range(self._num_parents)])
-        qs = ",".join(["?",]*self._num_parents)
+        parent_cols = ",".join([f"parent_{i}" for i in range(self._num_parents)])
+        qs = ",".join(
+            [
+                "?",
+            ]
+            * self._num_parents
+        )
         self.cursor.execute(
             f"""INSERT INTO individuals (generation, fitness, {parent_cols}) VALUES (?, ?, {qs})""",
-            (generation, repr(fitness), *parents)
+            (generation, repr(fitness), *parents),
         )
         self.conn.commit()
         curr_id = self.cursor.lastrowid
 
         # Insert genome
         self.cursor.execute(
-            """INSERT INTO genome (individual_id, genome) VALUES (?,?)""",
-            (curr_id, repr(genome))
+            """INSERT INTO genome (individual_id, genome) VALUES (?,?)""", (curr_id, repr(genome))
         )
         self.conn.commit()
 
         # Insert solution
         self.cursor.execute(
             """INSERT INTO solution (individual_id, solution) VALUES (?, ?)""",
-            (curr_id, repr(solution))
+            (curr_id, repr(solution)),
         )
         self.conn.commit()
 

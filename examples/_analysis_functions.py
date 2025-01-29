@@ -17,7 +17,8 @@ def softmax(x: Union[list, NDArray]) -> NDArray:
     """Apply a softmax operation on a list or numpy array."""
     if isinstance(x, list):
         x = np.array(x)
-    return (np.e ** x) / np.sum(np.e ** x)
+    return (np.e**x) / np.sum(np.e**x)
+
 
 def transform_image(x: Union[str, NDArray]) -> NDArray:
     """Transform an image into standard config."""
@@ -27,10 +28,12 @@ def transform_image(x: Union[str, NDArray]) -> NDArray:
     x = x.transpose(1, 2, 0)
     return x
 
+
 def to_tensor(x: str) -> torch.Tensor:
     """Convert a string to tensor."""
     x = np.array(literal_eval(x))
     return torch.Tensor(x)
+
 
 def load_and_combine_dfs(path: str, filters: list[str]) -> pd.DataFrame:
     """
@@ -48,7 +51,9 @@ def load_and_combine_dfs(path: str, filters: list[str]) -> pd.DataFrame:
     for elem in all_dfs:
         split_file = elem.split(".")[0].split("_")
         res_size = 4 if "wrn" in split_file else 3
-        if all((kw in split_file for kw in filters)) and (len(split_file) - len(filters) == res_size):
+        if all((kw in split_file for kw in filters)) and (
+            len(split_file) - len(filters) == res_size
+        ):
             tmp_df = pd.read_csv(elem)
             combined_df = pd.concat([tmp_df, combined_df], ignore_index=True)
             cols = tmp_df.columns
@@ -56,7 +61,10 @@ def load_and_combine_dfs(path: str, filters: list[str]) -> pd.DataFrame:
     combined_df.columns = cols
     return combined_df
 
-def get_tsne_from_values(*values: list[pd.Series], components: int = 2,  random_state: int = 0) -> list[Any]:
+
+def get_tsne_from_values(
+    *values: list[pd.Series], components: int = 2, random_state: int = 0
+) -> list[Any]:
     """Combine multiple data points and compute TSNE."""
     tsne = TSNE(n_components=components, random_state=random_state)
 
@@ -65,10 +73,15 @@ def get_tsne_from_values(*values: list[pd.Series], components: int = 2,  random_
     total = np.vstack([np.array(v) for v in values])
 
     emb_total = tsne.fit_transform(total)
-    return [emb_total[cl[i]:cl[i]+cl[i+1]] for i in range(len(cl)-1)]
+    return [emb_total[cl[i] : cl[i] + cl[i + 1]] for i in range(len(cl) - 1)]
 
-def filter_for_classes(*elements: list[pd.Series], class_information: pd.Series, classes: list[int],
-                       filter_class_information: bool = True) -> list[pd.Series]:
+
+def filter_for_classes(
+    *elements: list[pd.Series],
+    class_information: pd.Series,
+    classes: list[int],
+    filter_class_information: bool = True,
+) -> list[pd.Series]:
     """
     Filter elements based on classes, last element is used to filter.
 
@@ -78,14 +91,17 @@ def filter_for_classes(*elements: list[pd.Series], class_information: pd.Series,
     :param filter_class_information: Whether to filter class information elements aswell.
     :returns: The filtered elements.
     """
-    assert all((len(e) == len(class_information) for e in elements)), "Error, series provided have different lengths."
+    assert all(
+        (len(e) == len(class_information) for e in elements)
+    ), "Error, series provided have different lengths."
     mask = class_information.isin(classes)
 
     elements = [e[mask] for e in elements]
     elements = elements + [class_information[mask]] if filter_class_information else elements
     return elements
 
-def get_boundary_stats(y1:pd.Series, y2:pd.Series) -> tuple[NDArray, float]:
+
+def get_boundary_stats(y1: pd.Series, y2: pd.Series) -> tuple[NDArray, float]:
     """
     Get boundary coverage measures based on Kolmogorov-Smirnov distance.
 
@@ -110,7 +126,7 @@ def get_boundary_stats(y1:pd.Series, y2:pd.Series) -> tuple[NDArray, float]:
             bl.remove(label)
             boundary_distribution[label] += bl
 
-    unif = np.full(9, 1/9)
+    unif = np.full(9, 1 / 9)
     distances = []
     for label, dist in boundary_distribution.items():
         hist, _ = np.histogram(dist, bins=10, range=(0, 10))
@@ -121,7 +137,8 @@ def get_boundary_stats(y1:pd.Series, y2:pd.Series) -> tuple[NDArray, float]:
 
         distances.append(dist)
     distances = np.array(distances)
-    return distances, esc/len(y1)
+    return distances, esc / len(y1)
+
 
 def laplacian_variance(arr: NDArray) -> float:
     """
@@ -137,12 +154,14 @@ def laplacian_variance(arr: NDArray) -> float:
     filtered = laplacian(arr)
     return filtered.var()
 
+
 def reduce_dim(arr: NDArray) -> NDArray:
     arr = arr.squeeze()
     shape = arr.shape
     if len(shape) == 3:
-        arr = arr.sum(axis=np.argmin(shape))/ min(shape)
+        arr = arr.sum(axis=np.argmin(shape)) / min(shape)
     return arr
+
 
 def format_cols(df: pd.DataFrame) -> None:
     for c in df.columns:
@@ -151,24 +170,27 @@ def format_cols(df: pd.DataFrame) -> None:
         if "y" in c:
             df[c] = df[c].apply(lambda x: np.array(literal_eval(x)))
 
+
 def distance_to_boundary(arr: NDArray) -> float:
     arr = arr.squeeze()
     boundary_indices = np.argsort(arr)[::-1][:2]
     ideal = np.zeros_like(arr)
     ideal[boundary_indices] = 0.5
-    return np.linalg.norm(ideal-arr)
+    return np.linalg.norm(ideal - arr)
 
 
 """Plotting Functions."""
+
 
 def plot_compare_images_with_confidences(im1, im2, y, yp) -> None:
     fig, ax = plt.subplots(2, 2, figsize=(10, 10))
     ax[0, 0].imshow(im1)
     ax[0, 1].imshow(im2)
     classes = range(len(y))
-    ax[1, 0].bar(classes,y)
+    ax[1, 0].bar(classes, y)
     ax[1, 1].bar(classes, yp)
     plt.show()
+
 
 def plot_compare_image_differences(im1, im2) -> None:
     diff = im1 - im2
@@ -180,16 +202,17 @@ def plot_compare_image_differences(im1, im2) -> None:
     fig.colorbar(h)
     plt.show()
 
+
 def plot_manifold_analysis(
-        emb_dataset,
-        emb_orig,
-        emb_targets,
-        dataset_classes: list[int],
-        orig_classes: list[int],
-        targets_classes: list[int],
-        cmap,
-        mask_thresh: float = 0.02,
-        show_arrows: bool = False,
+    emb_dataset,
+    emb_orig,
+    emb_targets,
+    dataset_classes: list[int],
+    orig_classes: list[int],
+    targets_classes: list[int],
+    cmap,
+    mask_thresh: float = 0.02,
+    show_arrows: bool = False,
 ) -> None:
     """
     Plot manifold analysis using.
@@ -204,8 +227,8 @@ def plot_manifold_analysis(
     :param show_arrows: Whether to show arrows of data transformations.
     """
     print("Plotting... This takes some time :)")
-    x,y = emb_dataset.max(axis=0)
-    x,y = int(x*1.1), int(y*1.1)
+    x, y = emb_dataset.max(axis=0)
+    x, y = int(x * 1.1), int(y * 1.1)
 
     xx, yy = np.meshgrid(np.linspace(-x, x, 300), np.linspace(-y, y, 300))
     grid_points = np.c_[xx.ravel(), yy.ravel()]
@@ -239,15 +262,20 @@ def plot_manifold_analysis(
     fig, ax = plt.subplots(1, 1, figsize=(10, 10))
 
     ax.contourf(xx, yy, filtered, cmap=cmap, alpha=0.3, levels=np.arange(-1, len(unique_classes)))
-    ax.scatter(x=emb_dataset[:, 0], y=emb_dataset[:, 1], c=dataset_classes, cmap=cmap, alpha=0.1, s=1)
+    ax.scatter(
+        x=emb_dataset[:, 0], y=emb_dataset[:, 1], c=dataset_classes, cmap=cmap, alpha=0.1, s=1
+    )
     ax.scatter(x=emb_orig[:, 0], y=emb_orig[:, 1], c=orig_classes, cmap=cmap, s=15, marker="x")
-    ax.scatter(x=emb_targets[:, 0], y=emb_targets[:, 1], c=targets_classes, cmap=cmap, s=30, marker="*")
+    ax.scatter(
+        x=emb_targets[:, 0], y=emb_targets[:, 1], c=targets_classes, cmap=cmap, s=30, marker="*"
+    )
     if show_arrows:
         for source, target in zip(emb_orig, emb_targets):
             ax.annotate("", target, source, arrowprops=dict(arrowstyle="->"))
     plt.show()
 
-def plot_measures(exps: list[str], dfs:list[list[pd.DataFrame]]) -> None:
+
+def plot_measures(exps: list[str], dfs: list[list[pd.DataFrame]]) -> None:
     num_methods = len(dfs)
 
     for i, exp in enumerate(exps):
@@ -261,9 +289,7 @@ def plot_measures(exps: list[str], dfs:list[list[pd.DataFrame]]) -> None:
             xps_cols = [c for c in df.columns if ("X" in c) and ("p" in c)]
             res = pd.Series(0, index=x.index)
             for c in xps_cols:
-                res += x-df[c].apply(CFrobeniusDistance._frob)
+                res += x - df[c].apply(CFrobeniusDistance._frob)
             res /= len(xps_cols)
             image_dists.append(res)
     pass
-
-

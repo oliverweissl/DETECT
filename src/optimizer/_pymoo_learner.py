@@ -50,7 +50,8 @@ class PymooLearner(Learner):
 
         self._best_candidates = [
             OptimizerCandidate(
-                solution=np.random.uniform(high=ub, low=lb, size=n_var), fitness=[np.inf] * num_objectives
+                solution=np.random.uniform(high=ub, low=lb, size=n_var),
+                fitness=[np.inf] * num_objectives,
             )
         ]
         self._previous_best = self._best_candidates.copy()

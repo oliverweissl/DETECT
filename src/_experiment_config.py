@@ -5,6 +5,7 @@ from typing import Optional
 @dataclass
 class ExperimentConfig:
     """A simple Dataclass to store experiment configs."""
+
     samples_per_class: int  # How candidates should be searched for per class
     generations: int  # How many generations we search for candidates.
 

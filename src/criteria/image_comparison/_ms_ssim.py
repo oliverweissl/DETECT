@@ -2,8 +2,8 @@ from typing import Any
 
 from sewar import msssim
 
-from .._criterion import Criterion
 from .._criteria_arguments import CriteriaArguments
+from .._criterion import Criterion
 from ._prepare_tensor import prepare_tensor
 
 

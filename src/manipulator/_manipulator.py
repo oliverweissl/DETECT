@@ -7,5 +7,4 @@ class Manipulator(ABC):
 
     # TODO: Make abstraction that is useful
     @abstractmethod
-    def manipulate(self,candidates, cond, weights, random_seed) -> Any:
-        ...
+    def manipulate(self, candidates, cond, weights, random_seed) -> Any: ...
