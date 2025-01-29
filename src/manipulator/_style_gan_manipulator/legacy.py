@@ -9,8 +9,10 @@
 """Converting legacy network pickle into the new format."""
 
 import copy
+import os
 import pickle
 import re
+import sys
 
 import click
 import numpy as np
@@ -23,6 +25,7 @@ from .torch_utils import misc
 
 
 def load_network_pkl(f, force_fp16=False):
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
     data = _LegacyUnpickler(f).load()
 
     # Legacy TensorFlow pickle => convert.
@@ -392,7 +395,7 @@ def convert_network_pickle(source, dest, force_fp16):
         --dest=stylegan2-cat-config-f.pkl
     """
     print(f'Loading "{source}"...')
-    with dnnlib.util.open_url(source) as f:
+    with src.manipulator._style_gan_manipulator.dnnlib.util.open_url(source) as f:
         data = load_network_pkl(f, force_fp16=force_fp16)
     print(f'Saving "{dest}"...')
     with open(dest, "wb") as f:

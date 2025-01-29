@@ -1,14 +1,14 @@
 from typing import Union
 
-import dnnlib
 import numpy as np
 import torch
 from torch import Tensor
-from torch_utils.ops import upfirdn2d
 
 from .._manipulator import Manipulator
 from .._mix_candidate import CandidateList
+from . import dnnlib
 from ._load_stylegan import load_stylegan
+from .torch_utils.ops import upfirdn2d
 
 
 class StyleGANManipulator(Manipulator):
@@ -56,7 +56,7 @@ class StyleGANManipulator(Manipulator):
         )
         self._device = device
         self._generator.to(self._device)
-        self._has_input_transform = hasattr(generator.synthesis, "input") and hasattr(
+        self._has_input_transform = hasattr(self._generator.synthesis, "input") and hasattr(
             generator.synthesis.input, "transform"
         )
 

@@ -80,6 +80,7 @@ def main(
     generations: int = 150,
     interpolate: bool = True,
     frontier_pairs: bool = False,
+    validity_domain: bool = False,
 ) -> None:
     """
     Run the experiments done in the paper.
@@ -92,6 +93,7 @@ def main(
     :param generations: The number of generations to run the optimization.
     :param interpolate: Whether to interpolate the style layers.
     :param frontier_pairs: Whether to use the frontier pairs.
+    :param validity_domain: Whether to check the boundary towards the validity domain or class boundaries.
     """
 
     # Define the configurations for our experiments.
@@ -121,7 +123,8 @@ def main(
         generations=generations,
         classes=10,
         save_to=f"results_lmt_{dataset}_{predictor}_{generator}_{objective}"
-        + ("sm" if not interpolate else ""),
+        + ("sm" if not interpolate else "")
+        + ("vd" if validity_domain else ""),
     )
 
     """Initialize the framework with all components."""

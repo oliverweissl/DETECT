@@ -16,7 +16,8 @@ import re
 import numpy as np
 import torch
 
-from .. import dnnlib
+from src.manipulator._style_gan_manipulator import dnnlib
+
 from . import misc
 
 # ----------------------------------------------------------------------------
