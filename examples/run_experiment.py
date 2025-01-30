@@ -127,8 +127,8 @@ def main(
         generations=generations,
         classes=10,
         save_to=f"results_lmt_{dataset}_{predictor}_{generator}_{objective}"
-        + ("sm" if not interpolate else "")
-        + ("vd" if validity_domain else ""),
+        + ("_sm" if not interpolate else "")
+        + ("_vd" if validity_domain else ""),
     )
 
     """Initialize the framework with all components."""

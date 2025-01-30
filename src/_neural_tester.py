@@ -314,7 +314,7 @@ class NeuralTester:
         logging.info("Generate noise seeds.")
         # For logging purposes to see how many samples we need to find valid seed.
         w: Tensor = self._manipulator.get_w(self._get_time_seed(), 0)
-        ws = [torch.randn(w.size()) for _ in range(amount)]
+        ws = [torch.randn(w.size(), device=w.device) for _ in range(amount)]
         imgs = [self._assure_rgb(self._manipulator.get_image(w)) for w in ws]
         y_hats = [self._sut(img.unsqueeze(0)) for img in imgs]
 

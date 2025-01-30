@@ -30,5 +30,5 @@ class UncertaintyThreshold(Criterion):
         :return: The distance to the uncertainty threshold.
         """
         ypm = default_args.yp.max()
-        dist = self._threshold - ypm
+        dist = self._threshold - ypm.item()
         return abs(dist) if self._absolute else dist
