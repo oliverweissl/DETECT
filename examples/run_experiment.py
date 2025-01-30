@@ -18,8 +18,10 @@ from src.defaults.objective_configs import (
     UNTARGETED_ADVERSARIAL_TESTING,
     ADVERSARIAL_BOUNDARY_TESTING,
     DIVERSITY_SAMPLING,
+    VALIDITY_BOUNDARY_TESTING,
 )
 from src.manipulator import StyleGANManipulator
+from models.mcd_scaffold import MonteCarloDropoutScaffold
 
 """Some dicts to easily associate elements to arguments."""
 OBJECTIVES = {
@@ -29,6 +31,7 @@ OBJECTIVES = {
     "uat": UNTARGETED_ADVERSARIAL_TESTING,
     "tat": TARGETED_ADVERSARIAL_TESTING,
     "ds": DIVERSITY_SAMPLING,
+    "vbt": VALIDITY_BOUNDARY_TESTING,
 }
 
 MODEL_COMBINATIONS = {
@@ -105,6 +108,7 @@ def main(
 
     """Initialize components of the framework."""
     sut = torch.load(p)
+    sut = MonteCarloDropoutScaffold(sut) if validity_domain else sut  # If we test validity domain we use MC-Dropout UQ
     sut = sut.to(device)
     sut.eval()
 

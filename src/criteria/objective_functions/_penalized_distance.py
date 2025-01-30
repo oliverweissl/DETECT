@@ -16,6 +16,7 @@ class PenalizedDistance(Criterion):
 
         :param metric: The metric used in the measure calculation.
         """
+        super().__init__()
         self.metric = metric
 
     def evaluate(self, *, default_args: CriteriaArguments, **_: Any) -> float:

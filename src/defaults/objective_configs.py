@@ -6,10 +6,11 @@ from ..criteria.objective_functions import (
     IsMisclassified,
     NaiveConfidenceBalance,
 )
+from ..criteria.classifier_objectives import UncertaintyThreshold
 
 """
-### ADVESERIAL TESTING:
-When doing adveserial testing we aim to find inputs that are close to the original, but perturb the classifiers predictions.
+### ADVERSARIAL TESTING:
+When doing adversarial testing we aim to find inputs that are close to the original, but perturb the classifiers predictions.
 
 In the untargeted case we do not care what class the perturbed input fall into.
 In the targeted case we want to find a perturbed input with a specific (secondary) class.
@@ -31,7 +32,7 @@ TARGETED_ADVERSARIAL_TESTING = [
 Boundary testing essentially tries to find inputs that confuse the classifier, i.e. where the confidence of 2 or n classes are in a balance.
 
 This again can be untargeted, where we do not care about the final class or targeted where we want to find a specific boundary.
-Note that here we dont care about the distance of images, since the boundary can either be of an advesarial subset in the classifiers desicion-manifold, or it can be a different class set entirely.
+Note that here we dont care about the distance of images, since the boundary can either be of an adversarial subset in the classifiers desicion-manifold, or it can be a different class set entirely.
 """
 UNTARGETED_BOUNDARY_TESTING = [DynamicConfidenceBalance()]
 TARGETED_BOUNDARY_TESTING = [NaiveConfidenceBalance()]
@@ -50,4 +51,4 @@ DIVERSITY_SAMPLING = [CFrobeniusDistance(inverse=True), IsMisclassified()]
 ### Validity Boundary Testing.
 Here we want to find the boundary to the validity domain in the classifier. As this is not formalizable we approximate it here.
 """
-VALIDITY_BOUNDARY_TESTING = []
+VALIDITY_BOUNDARY_TESTING = [UncertaintyThreshold(0.95, absolute=True), IsMisclassified()]
