@@ -13,13 +13,20 @@ import os
 import pickle
 import re
 import sys
-
+import io
 import click
 import numpy as np
 import torch
 
-from . import dnnlib
-from .torch_utils import misc
+try:
+    from .dnnlib import EasyDict
+    from .dnnlib.util import open_url
+    from .torch_utils import misc
+except ImportError as e:
+    from dnnlib import EasyDict
+    from dnnlib.util import open_url
+    from torch_utils import misc
+
 
 # ----------------------------------------------------------------------------
 
@@ -71,7 +78,7 @@ def load_network_pkl(f, force_fp16=False):
 # ----------------------------------------------------------------------------
 
 
-class _TFNetworkStub(dnnlib.EasyDict):
+class _TFNetworkStub(EasyDict):
     pass
 
 
@@ -79,6 +86,8 @@ class _LegacyUnpickler(pickle.Unpickler):
     def find_class(self, module, name):
         if module == "dnnlib.tflib.network" and name == "Network":
             return _TFNetworkStub
+        elif module == 'torch.storage' and name == '_load_from_bytes':  # Addition from StyleGAN-XL
+            return lambda b: torch.load(io.BytesIO(b), map_location='cpu')
         return super().find_class(module, name)
 
 
@@ -142,7 +151,7 @@ def convert_tf_generator(tf_G):
     from training import networks_stylegan2
 
     network_class = networks_stylegan2.Generator
-    kwargs = dnnlib.EasyDict(
+    kwargs = EasyDict(
         z_dim=kwarg("latent_size", 512),
         c_dim=kwarg("label_size", 0),
         w_dim=kwarg("dlatent_size", 512),
@@ -156,7 +165,7 @@ def convert_tf_generator(tf_G):
         resample_filter=kwarg("resample_kernel", [1, 3, 3, 1]),
         use_noise=kwarg("use_noise", True),
         activation=kwarg("nonlinearity", "lrelu"),
-        mapping_kwargs=dnnlib.EasyDict(
+        mapping_kwargs=EasyDict(
             num_layers=kwarg("mapping_layers", 8),
             embed_features=kwarg("label_fmaps", None),
             layer_features=kwarg("mapping_fmaps", None),
@@ -275,7 +284,7 @@ def convert_tf_discriminator(tf_D):
         return tf_kwargs.get(tf_name, default)
 
     # Convert kwargs.
-    kwargs = dnnlib.EasyDict(
+    kwargs = EasyDict(
         c_dim=kwarg("label_size", 0),
         img_resolution=kwarg("resolution", 1024),
         img_channels=kwarg("num_channels", 3),
@@ -285,19 +294,19 @@ def convert_tf_discriminator(tf_D):
         num_fp16_res=kwarg("num_fp16_res", 0),
         conv_clamp=kwarg("conv_clamp", None),
         cmap_dim=kwarg("mapping_fmaps", None),
-        block_kwargs=dnnlib.EasyDict(
+        block_kwargs=EasyDict(
             activation=kwarg("nonlinearity", "lrelu"),
             resample_filter=kwarg("resample_kernel", [1, 3, 3, 1]),
             freeze_layers=kwarg("freeze_layers", 0),
         ),
-        mapping_kwargs=dnnlib.EasyDict(
+        mapping_kwargs=EasyDict(
             num_layers=kwarg("mapping_layers", 0),
             embed_features=kwarg("mapping_fmaps", None),
             layer_features=kwarg("mapping_fmaps", None),
             activation=kwarg("nonlinearity", "lrelu"),
             lr_multiplier=kwarg("mapping_lrmul", 0.1),
         ),
-        epilogue_kwargs=dnnlib.EasyDict(
+        epilogue_kwargs=EasyDict(
             mbstd_group_size=kwarg("mbstd_group_size", None),
             mbstd_num_channels=kwarg("mbstd_num_features", 1),
             activation=kwarg("nonlinearity", "lrelu"),
@@ -395,7 +404,7 @@ def convert_network_pickle(source, dest, force_fp16):
         --dest=stylegan2-cat-config-f.pkl
     """
     print(f'Loading "{source}"...')
-    with src.manipulator._style_gan_manipulator.dnnlib.util.open_url(source) as f:
+    with open_url(source) as f:
         data = load_network_pkl(f, force_fp16=force_fp16)
     print(f'Saving "{dest}"...')
     with open(dest, "wb") as f:

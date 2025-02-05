@@ -57,7 +57,7 @@ class StyleGANManipulator(Manipulator):
         self._device = device
         self._generator.to(self._device)
         self._has_input_transform = hasattr(self._generator.synthesis, "input") and hasattr(
-            generator.synthesis.input, "transform"
+            self._generator.synthesis.input, "transform"
         )
 
         self._mix_dims = torch.arange(
@@ -94,6 +94,7 @@ class StyleGANManipulator(Manipulator):
             self._generator.synthesis.input.transform.copy_(torch.from_numpy(m))
 
         w_avg = self._generator.mapping.w_avg
+        w_avg = w_avg if len(w_avg.shape) == 1 else w_avg.mean(dim=tuple(range(len(w_avg.shape)-1)))
         wn_tensors = torch.vstack(candidates.wn_candidates.w_tensors) - w_avg
 
         """Get w0 vector."""

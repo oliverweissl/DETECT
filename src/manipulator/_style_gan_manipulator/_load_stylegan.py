@@ -1,6 +1,7 @@
 import torch
 
-from . import dnnlib, legacy
+from .legacy import load_network_pkl
+from .dnnlib.util import open_url
 
 
 def load_stylegan(file: str) -> torch.nn.Module:
@@ -10,5 +11,5 @@ def load_stylegan(file: str) -> torch.nn.Module:
     :param file: The file path.
     :returns: The module.
     """
-    with dnnlib.util.open_url(file) as f:
-        return legacy.load_network_pkl(f)["G_ema"]
+    with open_url(file) as f:
+        return load_network_pkl(f)["G_ema"]
