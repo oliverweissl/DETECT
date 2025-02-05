@@ -51,4 +51,4 @@ DIVERSITY_SAMPLING = [CFrobeniusDistance(inverse=True), IsMisclassified()]
 ### Validity Boundary Testing.
 Here we want to find the boundary to the validity domain in the classifier. As this is not formalizable we approximate it here.
 """
-VALIDITY_BOUNDARY_TESTING = [UncertaintyThreshold(0.95, absolute=True), IsMisclassified()]
+VALIDITY_BOUNDARY_TESTING = [UncertaintyThreshold(0.1, absolute=True), IsMisclassified()]
