@@ -10,7 +10,75 @@ import torch
 from numpy.typing import NDArray
 from typing import Union, Any
 
-from src.criteria.image_comparison import CFrobeniusDistance
+from src.criteria.image_comparison import CFrobeniusDistance, SSIMD2
+
+
+class ExperimentMetrics:
+    """A class to extract metrics from df."""
+    image_distance: list[float]  # Frobenius Distance between images.
+    boundary_distance: list[float]  # Euclidean Distance towards boundary.
+    ssim: list[float]  # SSIM between images.
+    lap_variance: list[float]  # Laplacian variance on image differences.
+
+    escape_ratios: list[float]  # Escape ratio of boundary search.
+    coverage: list[float]  # Boundary coverage metric.
+
+    def __init__(self, df:pd.DataFrame, xs: list[str], ys: list[str]) -> None:
+        """
+        Initialize the object and extract metrics from df.
+
+        :param df: The dataframe to extract metrics from.
+        :param xs: The names of the x columns to extract.
+        :param ys: The names of the y columns to extract.
+        """
+        self.df = format_cols(df.copy(), reduce_channels=True)
+
+        """Extract image distances."""
+        im_comp = CFrobeniusDistance()._frob
+        diffs = [(self.df["X"] - self.df[x]) for x in xs]
+        f_dist = [d.apply(im_comp) for d in diffs]
+        f_dist = self._apply_strategy(pd.DataFrame(f_dist), "min")
+        self.image_distance = f_dist.tolist()
+
+        """Extract SSIM between images."""
+        #ssim = SSIMD2()
+
+        #ssims = [df[["X", x]].apply(lambda row: ssim._ssim_d2(row.iloc[0][:,:, None], row.iloc[1][:,:, None]), axis=1) for x in xs]
+        #ssims = self._apply_strategy(pd.DataFrame(ssims), "max")
+        #self.ssim = ssims.tolist()
+
+        """Extract boundary distance."""
+        b_dists = [df[y].apply(distance_to_boundary) for y in ys]
+        b_dists = self._apply_strategy(pd.DataFrame(b_dists), "min")
+        self.boundary_distance = b_dists.tolist()
+
+        """Extract laplacian variance."""
+        lap_var = [d.apply(laplacian_variance) for d in diffs]
+        lap_var = self._apply_strategy(pd.DataFrame(lap_var), "max")
+        self.lap_variance = lap_var.tolist()
+
+        """Get boundary stats."""
+        cov_esc = [get_boundary_stats(df["y"], df[y]) for y in ys]
+        cov, esc = tuple(zip(*cov_esc))
+
+        esc = self._apply_strategy(pd.DataFrame(esc), "min")
+        self.escape_ratios = esc.tolist()
+
+        cov = self._apply_strategy(pd.DataFrame(cov), "max")
+        self.coverage = cov.tolist()
+
+
+    def _apply_strategy(self, df: pd.DataFrame, strategy: str) -> pd.DataFrame:
+        """Apply strategy for merging df columns."""
+        if strategy == "min":
+            return df.min(axis=0)
+        elif strategy == "max":
+            return df.min(axis=0)
+        elif strategy == "mean":
+            return df.mean(axis=0)
+        else:
+            raise NotImplementedError(f"Strategy {strategy} not implemented.")
+
 
 
 def softmax(x: Union[list, NDArray]) -> NDArray:
@@ -155,21 +223,21 @@ def laplacian_variance(arr: NDArray) -> float:
     return filtered.var()
 
 
-def reduce_dim(arr: NDArray) -> NDArray:
+def reduce_dim(arr: NDArray, reduce_channels: bool) -> NDArray:
     arr = arr.squeeze()
     shape = arr.shape
-    if len(shape) == 3:
+    if len(shape) == 3 and reduce_channels:
         arr = arr.sum(axis=np.argmin(shape)) / min(shape)
     return arr
 
 
-def format_cols(df: pd.DataFrame) -> None:
+def format_cols(df: pd.DataFrame, reduce_channels: bool = False) -> None:
     for c in df.columns:
         if "X" in c:
-            df[c] = df[c].apply(lambda x: reduce_dim(np.array(literal_eval(x))))
+            df[c] = df[c].apply(lambda x: reduce_dim(np.array(literal_eval(x)), reduce_channels))
         if "y" in c:
             df[c] = df[c].apply(lambda x: np.array(literal_eval(x)))
-
+    return df
 
 def distance_to_boundary(arr: NDArray) -> float:
     arr = arr.squeeze()
@@ -183,23 +251,43 @@ def distance_to_boundary(arr: NDArray) -> float:
 
 
 def plot_compare_images_with_confidences(im1, im2, y, yp) -> None:
-    fig, ax = plt.subplots(2, 2, figsize=(10, 10))
+    fig, ax = plt.subplots(2, 2, figsize=(10, 7), gridspec_kw={'height_ratios': [2, 1]})
     ax[0, 0].imshow(im1)
     ax[0, 1].imshow(im2)
     classes = range(len(y))
-    ax[1, 0].bar(classes, y)
-    ax[1, 1].bar(classes, yp)
+    ax[1, 0].bar(classes, y, color="darkgreen")
+    ax[1, 1].bar(classes, yp, color="darkgreen")
+
+    for i in range(2):
+        ax[0, i].axis('off')
+
+        ax[1, i].grid()
+        ax[1, i].set_ylim([0,1])
+        ax[1, i].set_xticks(range(10))
+        ax[1, i].set_xlabel("Classes")
+        ax[1, i].set_xticklabels(range(10))
+    ax[1,0].set_ylabel("SUT Confidence")
+    ax[1,1].set_yticklabels([])
+
+    plt.tight_layout()
+    plt.subplots_adjust(hspace=0.1, wspace=0)
     plt.show()
 
 
-def plot_compare_image_differences(im1, im2) -> None:
+def plot_compare_image_differences(im1, im2, greyscale: bool = False) -> None:
     diff = im1 - im2
 
-    fig, ax = plt.subplots(1, 3, figsize=(10, 10))
-    ax[0].imshow(diff[:, :, 0], cmap="seismic", vmin=-1, vmax=1)
-    ax[1].imshow(diff[:, :, 1], cmap="seismic", vmin=-1, vmax=1)
-    h = ax[2].imshow(diff[:, :, 2], cmap="seismic", vmin=-1, vmax=1)
-    fig.colorbar(h)
+    h = 1 if greyscale else 3
+    diff = diff.sum(axis=-1, keepdims=True) if greyscale else diff
+
+    fig, ax = plt.subplots(1, h+1, figsize=(4*h+0.2, 4), gridspec_kw={'width_ratios': [1]*h + [0.05]})
+    for i in range(h):
+        h = ax[i].imshow(diff[:, :, i], cmap="seismic", vmin=-1, vmax=1)
+        ax[i].axis("off")
+
+    cbar = plt.colorbar(h, cax=ax[-1])
+    plt.tight_layout()
+    plt.subplots_adjust(hspace=0.1, wspace=0.05)
     plt.show()
 
 

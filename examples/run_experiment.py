@@ -23,6 +23,8 @@ from src.defaults.objective_configs import (
 from src.manipulator import StyleGANManipulator
 from models.mcd_scaffold import MonteCarloDropoutScaffold
 
+from torchvision.models import wide_resnet50_2
+
 """Some dicts to easily associate elements to arguments."""
 OBJECTIVES = {
     "ubt": UNTARGETED_BOUNDARY_TESTING,
@@ -64,11 +66,11 @@ MODEL_COMBINATIONS = {
         "sgXL": NotImplementedError("Model not implemented."),
     },
     "Imagenet": {
-        "wrn": NotImplementedError("Model not implemented."),
+        "wrn": wide_resnet50_2(pretrained=True),
         "vit": NotImplementedError("Model not implemented."),
         "sg2": NotImplementedError("Model not implemented."),
         "sg3": NotImplementedError("Model not implemented."),
-        "sgXL": "../models/generators/sgXL_imagenet.pkl",
+        "sgXL": "../models/generators/sgXL_imagenet128.pkl",
     },
 }
 
@@ -107,7 +109,7 @@ def main(
     device = torch.device("cuda")
 
     """Initialize components of the framework."""
-    sut = torch.load(p)
+    sut = torch.load(p) if isinstance(p, str) else p
     sut = MonteCarloDropoutScaffold(sut) if validity_domain else sut  # If we test validity domain we use MC-Dropout UQ
     sut = sut.to(device)
     sut.eval()
