@@ -34,6 +34,7 @@ class NeuralTester:
     _config: ExperimentConfig
     _num_w0: int
     _num_ws: int
+    _restrict_classes: bool
 
     """Temporary Variables."""
     _img_rgb: Tensor
@@ -50,6 +51,7 @@ class NeuralTester:
         num_w0: int = 1,
         num_ws: int = 1,
         silent_wandb: bool = False,
+        restrict_classes: bool = True,
     ):
         """
         Initialize the Neural Tester.
@@ -63,6 +65,7 @@ class NeuralTester:
         :param num_w0: The number of primary seeds.
         :param num_ws: The number of target seeds.
         :param silent_wandb: Whether to silence wandb.
+        :param restrict_classes: Whether to restrict classes if config num classes < SUT prediction classes.
         """
 
         self._sut = sut
@@ -78,6 +81,7 @@ class NeuralTester:
 
         self._df = DefaultDF(pairs=frontier_pairs)
         self._silent = silent_wandb
+        self._restrict_classes = restrict_classes
 
     def test(self, validity_domain: bool = False) -> None:
         """
@@ -151,7 +155,7 @@ class NeuralTester:
                             *c.fitness,
                             *c.solution,
                             wandb.Image(c.data[0]),
-                            *c.data[1],
+                            *c.data[1][:self._config.classes],
                         ]
                         for c in self._optimizer.best_candidates
                     ],
@@ -207,7 +211,7 @@ class NeuralTester:
         images = [self._assure_rgb(img) for img in images]
 
         """We predict the label from the mixed images."""
-        predictions: Tensor = self._sut(torch.stack(images))
+        predictions: Tensor = self._predict(torch.stack(images))
         predictions_softmax = self._softmax(predictions)
         fitness = tuple(
             [
@@ -294,7 +298,7 @@ class NeuralTester:
             # We generate and transform the image to RGB if it is in Grayscale.
             img = self._manipulator.get_image(w)
             img = self._assure_rgb(img)
-            y_hat = self._sut(img.unsqueeze(0))
+            y_hat = self._predict(img.unsqueeze(0))
 
             # We are only interested in candidate if the prediction matches the label
             if y_hat.argmax() == cls:
@@ -316,7 +320,7 @@ class NeuralTester:
         w: Tensor = self._manipulator.get_w(self._get_time_seed(), 0)
         ws = [torch.randn(w.size(), device=w.device) for _ in range(amount)]
         imgs = [self._assure_rgb(self._manipulator.get_image(w)) for w in ws]
-        y_hats = [self._sut(img.unsqueeze(0)) for img in imgs]
+        y_hats = [self._predict(img.unsqueeze(0)) for img in imgs]
 
         logging.info(f"\tFound {amount} valid seed(s).")
         return ws, imgs, y_hats, 0
@@ -380,3 +384,13 @@ class NeuralTester:
             return image
         else:
             raise ValueError(f"Unknown image shape. {image.shape}")
+
+    def _predict(self, x: Tensor) -> Tensor:
+        """
+        A wrapper to predict with additional conditions.
+
+        :param x: The image to be predicted.
+        :returns: The predicted labels.
+        """
+        y_hat = self._sut(x)
+        return y_hat if not self._restrict_classes else y_hat[:,:self._config.classes]
