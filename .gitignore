@@ -7,5 +7,7 @@
 __pycache__
 datasets/*.zip
 **/_artifacts/
+**/artifacts/
+**/figures/
 **/*data*/
 wandb/
