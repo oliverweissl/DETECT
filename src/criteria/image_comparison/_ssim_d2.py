@@ -1,6 +1,7 @@
 from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 from scipy.ndimage import gaussian_filter
 
 from .._criteria_arguments import CriteriaArguments
@@ -36,6 +37,7 @@ class SSIMD2(Criterion):
         """
         self.truncate, self.sigma, self.k1, self.k2 = truncate, sigma, k1, k2
         self._name = "SSIM-D2"
+        super().__init__()
 
     def evaluate(
         self,
@@ -54,6 +56,18 @@ class SSIMD2(Criterion):
         assert (
             i1.shape == i2.shape
         ), f"Error: Both images need to be of same size ({i1.shape}, {i2.shape})."
+
+        score = self._ssim_d2(i1, i2)
+        return score
+
+    def _ssim_d2(self, i1: NDArray, i2: NDArray) -> float:
+        """
+        Compute the SSIM D2 metric.
+
+        :param i1: First image.
+        :param i2: Second image.
+        :returns: SSIM score.
+        """
         filter_curry = lambda image: gaussian_filter(
             image, sigma=self.sigma, truncate=self.truncate
         )
@@ -71,7 +85,7 @@ class SSIMD2(Criterion):
 
         a1 = 2.0 * ux * uy + c1
         a2 = 2.0 * vxy + c2
-        b1 = ux**2.0 + uy**2.0 + c1
+        b1 = ux ** 2.0 + uy ** 2.0 + c1
         b2 = vx + vy + c2
 
         s1 = np.clip(a1 / b1, 0, 1)
