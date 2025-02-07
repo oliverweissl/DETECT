@@ -86,6 +86,7 @@ def main(
     interpolate: bool = True,
     frontier_pairs: bool = False,
     validity_domain: bool = False,
+    run_experiments_separately: bool = False,
 ) -> None:
     """
     Run the experiments done in the paper.
@@ -99,6 +100,7 @@ def main(
     :param interpolate: Whether to interpolate the style layers.
     :param frontier_pairs: Whether to use the frontier pairs.
     :param validity_domain: Whether to check the boundary towards the validity domain or class boundaries.
+    :param run_experiments_separately: Whether to run the experiments separately (useful for long runs to avoid crashes).
     """
 
     # Define the configurations for our experiments.
@@ -122,30 +124,33 @@ def main(
         n_var=mix_dims[1] - mix_dims[0],
         num_objectives=len(metrics),
     )
+    class_collection = [[i] for i in range(10)] if run_experiments_separately else [list(range(10))]
+    seperately_named = [f"_{i}" for i in range(10)] if run_experiments_separately else ""
+    for clss, nm in zip(class_collection, seperately_named):
+        """Make a config (used for logging and more)."""
+        conf = ExperimentConfig(
+            samples_per_class=10,
+            generations=generations,
+            classes=clss,
+            save_to=f"results_lmt_{dataset}_{predictor}_{generator}_{objective}{nm}"
+            + ("_sm" if not interpolate else "")
+            + ("_vd" if validity_domain else ""),
+        )
 
-    """Make a config (used for logging and more)."""
-    conf = ExperimentConfig(
-        samples_per_class=10,
-        generations=generations,
-        classes=10,
-        save_to=f"results_lmt_{dataset}_{predictor}_{generator}_{objective}"
-        + ("_sm" if not interpolate else "")
-        + ("_vd" if validity_domain else ""),
-    )
+        """Initialize the framework with all components."""
+        tester = NeuralTester(
+            sut=sut,
+            manipulator=manipulator,
+            optimizer=optimizer,
+            objectives=metrics,
+            frontier_pairs=frontier_pairs,
+            silent_wandb=True,
+            config=conf,
+            restrict_classes=list(range(10))  # For these experiments we only consider the first 10 classes.
+        )
 
-    """Initialize the framework with all components."""
-    tester = NeuralTester(
-        sut=sut,
-        manipulator=manipulator,
-        optimizer=optimizer,
-        objectives=metrics,
-        frontier_pairs=frontier_pairs,
-        silent_wandb=True,
-        config=conf,
-    )
-
-    # We start the testing procedure.
-    tester.test(validity_domain=validity_domain)
+        # We start the testing procedure.
+        tester.test(validity_domain=validity_domain)
 
 
 def _int_tuple(s: str) -> tuple[int, ...]:

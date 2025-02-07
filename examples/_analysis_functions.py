@@ -1,15 +1,12 @@
 import pandas as pd
 from glob import glob
-import matplotlib.pyplot as plt
 from ast import literal_eval
 import numpy as np
 from sklearn.manifold import TSNE
-from scipy.stats import gaussian_kde
 from scipy.sparse.csgraph import laplacian
 import torch
 from numpy.typing import NDArray
 from typing import Union, Any
-
 from src.criteria.image_comparison import CFrobeniusDistance, SSIMD2
 
 
@@ -31,21 +28,19 @@ class ExperimentMetrics:
         :param xs: The names of the x columns to extract.
         :param ys: The names of the y columns to extract.
         """
-        self.df = format_cols(df.copy(), reduce_channels=True)
-
         """Extract image distances."""
         im_comp = CFrobeniusDistance()._frob
-        diffs = [(self.df["X"] - self.df[x]) for x in xs]
+        diffs = [(df["X"] - df[x]) for x in xs]
         f_dist = [d.apply(im_comp) for d in diffs]
         f_dist = self._apply_strategy(pd.DataFrame(f_dist), "min")
         self.image_distance = f_dist.tolist()
 
         """Extract SSIM between images."""
-        #ssim = SSIMD2()
+        ssim = SSIMD2()
 
-        #ssims = [df[["X", x]].apply(lambda row: ssim._ssim_d2(row.iloc[0][:,:, None], row.iloc[1][:,:, None]), axis=1) for x in xs]
-        #ssims = self._apply_strategy(pd.DataFrame(ssims), "max")
-        #self.ssim = ssims.tolist()
+        ssims = [df[["X", x]].apply(lambda row: ssim._ssim_d2(row.iloc[0][:,:, None], row.iloc[1][:,:, None]), axis=1) for x in xs]
+        ssims = self._apply_strategy(pd.DataFrame(ssims), "max")
+        self.ssim = ssims.tolist()
 
         """Extract boundary distance."""
         b_dists = [df[y].apply(distance_to_boundary) for y in ys]
@@ -78,7 +73,6 @@ class ExperimentMetrics:
             return df.mean(axis=0)
         else:
             raise NotImplementedError(f"Strategy {strategy} not implemented.")
-
 
 
 def softmax(x: Union[list, NDArray]) -> NDArray:
@@ -231,11 +225,11 @@ def reduce_dim(arr: NDArray, reduce_channels: bool) -> NDArray:
     return arr
 
 
-def format_cols(df: pd.DataFrame, reduce_channels: bool = False) -> None:
+def format_cols(df: pd.DataFrame, reduce_channels: bool = False) -> pd.DataFrame:
     for c in df.columns:
         if "X" in c:
             df[c] = df[c].apply(lambda x: reduce_dim(np.array(literal_eval(x)), reduce_channels))
-        if "y" in c:
+        elif "y" in c:
             df[c] = df[c].apply(lambda x: np.array(literal_eval(x)))
     return df
 
@@ -245,139 +239,3 @@ def distance_to_boundary(arr: NDArray) -> float:
     ideal = np.zeros_like(arr)
     ideal[boundary_indices] = 0.5
     return np.linalg.norm(ideal - arr)
-
-
-"""Plotting Functions."""
-
-
-def plot_compare_images_with_confidences(im1, im2, y, yp) -> None:
-    fig, ax = plt.subplots(2, 2, figsize=(10, 7), gridspec_kw={'height_ratios': [2, 1]})
-    ax[0, 0].imshow(im1)
-    ax[0, 1].imshow(im2)
-    classes = range(len(y))
-    ax[1, 0].bar(classes, y, color="darkgreen")
-    ax[1, 1].bar(classes, yp, color="darkgreen")
-
-    for i in range(2):
-        ax[0, i].axis('off')
-
-        ax[1, i].grid()
-        ax[1, i].set_ylim([0,1])
-        ax[1, i].set_xticks(range(10))
-        ax[1, i].set_xlabel("Classes")
-        ax[1, i].set_xticklabels(range(10))
-    ax[1,0].set_ylabel("SUT Confidence")
-    ax[1,1].set_yticklabels([])
-
-    plt.tight_layout()
-    plt.subplots_adjust(hspace=0.1, wspace=0)
-    plt.show()
-
-
-def plot_compare_image_differences(im1, im2, greyscale: bool = False) -> None:
-    diff = im1 - im2
-
-    h = 1 if greyscale else 3
-    diff = diff.sum(axis=-1, keepdims=True) if greyscale else diff
-
-    fig, ax = plt.subplots(1, h+1, figsize=(4*h+0.2, 4), gridspec_kw={'width_ratios': [1]*h + [0.05]})
-    for i in range(h):
-        h = ax[i].imshow(diff[:, :, i], cmap="seismic", vmin=-1, vmax=1)
-        ax[i].axis("off")
-
-    cbar = plt.colorbar(h, cax=ax[-1])
-    plt.tight_layout()
-    plt.subplots_adjust(hspace=0.1, wspace=0.05)
-    plt.show()
-
-
-def plot_manifold_analysis(
-    emb_dataset,
-    emb_orig,
-    emb_targets,
-    dataset_classes: list[int],
-    orig_classes: list[int],
-    targets_classes: list[int],
-    cmap,
-    mask_thresh: float = 0.02,
-    show_arrows: bool = False,
-) -> None:
-    """
-    Plot manifold analysis using.
-
-    :param emb_dataset: Embedded dataset points.
-    :param emb_orig: Embedded seed for optimization.
-    :param emb_targets: Embedded results from optimization.
-    :param dataset_classes: List of classes for points in dataset.
-    :param orig_classes: List of classes for points in original dataset.
-    :param targets_classes: List of classes for points in generated targets.
-    :param mask_thresh: Mask threshold for density maps.
-    :param show_arrows: Whether to show arrows of data transformations.
-    """
-    print("Plotting... This takes some time :)")
-    x, y = emb_dataset.max(axis=0)
-    x, y = int(x * 1.1), int(y * 1.1)
-
-    xx, yy = np.meshgrid(np.linspace(-x, x, 300), np.linspace(-y, y, 300))
-    grid_points = np.c_[xx.ravel(), yy.ravel()]
-
-    dataset_classes = np.array(dataset_classes)
-    unique_classes = np.unique(dataset_classes)
-
-    """Generate density maps for each class and standardize to [0,1]."""
-    density_maps = {}
-    for cls in unique_classes:
-        class_points = emb_dataset[dataset_classes == cls]
-        kde = gaussian_kde(class_points.T)
-        density = kde(grid_points.T)
-        density /= density.max()
-        density_maps[cls] = density.reshape(xx.shape)
-
-    combined_density = np.zeros(xx.shape)
-    dominant_class = np.full(xx.shape, -1)
-
-    """Combine density masks such that dominant density is visible at single point."""
-    for cls, density in density_maps.items():
-        mask = density > combined_density
-        combined_density[mask] = density[mask]
-        dominant_class[mask] = cls
-
-    """Filter density masks to allow for unmasked regions."""
-    filtered = dominant_class.copy()
-    filtered[combined_density < mask_thresh] = -1
-    filtered = np.ma.masked_where(filtered == -1, filtered)
-
-    fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-
-    ax.contourf(xx, yy, filtered, cmap=cmap, alpha=0.3, levels=np.arange(-1, len(unique_classes)))
-    ax.scatter(
-        x=emb_dataset[:, 0], y=emb_dataset[:, 1], c=dataset_classes, cmap=cmap, alpha=0.1, s=1
-    )
-    ax.scatter(x=emb_orig[:, 0], y=emb_orig[:, 1], c=orig_classes, cmap=cmap, s=15, marker="x")
-    ax.scatter(
-        x=emb_targets[:, 0], y=emb_targets[:, 1], c=targets_classes, cmap=cmap, s=30, marker="*"
-    )
-    if show_arrows:
-        for source, target in zip(emb_orig, emb_targets):
-            ax.annotate("", target, source, arrowprops=dict(arrowstyle="->"))
-    plt.show()
-
-
-def plot_measures(exps: list[str], dfs: list[list[pd.DataFrame]]) -> None:
-    num_methods = len(dfs)
-
-    for i, exp in enumerate(exps):
-        target_dfs = [df[i] for df in dfs]
-
-        image_dists = []
-        boundary_dists = []
-        for df in target_dfs:
-            format_cols(df)
-            x = df["X"]
-            xps_cols = [c for c in df.columns if ("X" in c) and ("p" in c)]
-            res = pd.Series(0, index=x.index)
-            for c in xps_cols:
-                res += x - df[c].apply(CFrobeniusDistance._frob)
-            res /= len(xps_cols)
-            image_dists.append(res)
-    pass
