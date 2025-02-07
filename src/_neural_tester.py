@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from itertools import product
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 import torch
@@ -34,7 +34,7 @@ class NeuralTester:
     _config: ExperimentConfig
     _num_w0: int
     _num_ws: int
-    _restrict_classes: bool
+    _restrict_classes: Optional[list[int]]
 
     """Temporary Variables."""
     _img_rgb: Tensor
@@ -51,7 +51,7 @@ class NeuralTester:
         num_w0: int = 1,
         num_ws: int = 1,
         silent_wandb: bool = False,
-        restrict_classes: bool = True,
+        restrict_classes: Optional[list[int]] = None,
     ):
         """
         Initialize the Neural Tester.
@@ -65,7 +65,7 @@ class NeuralTester:
         :param num_w0: The number of primary seeds.
         :param num_ws: The number of target seeds.
         :param silent_wandb: Whether to silence wandb.
-        :param restrict_classes: Whether to restrict classes if config num classes < SUT prediction classes.
+        :param restrict_classes: What classes to restrict to.
         """
 
         self._sut = sut
@@ -79,7 +79,7 @@ class NeuralTester:
         self._config = config
         self._softmax = torch.nn.Softmax(dim=1)  # TODO: should be refractored probably
 
-        self._df = DefaultDF(pairs=frontier_pairs)
+        self._df = DefaultDF(pairs=frontier_pairs, additional_fields=["genome"])
         self._silent = silent_wandb
         self._restrict_classes = restrict_classes
 
@@ -89,15 +89,16 @@ class NeuralTester:
 
         :param validity_domain: Whether the validity domain should be tested for.
         """
-        spc, nc = self._config.samples_per_class, self._config.classes
+        spc, c = self._config.samples_per_class, self._config.classes
 
         logging.info(
-            f"Start testing. Number of classes: {nc}, iterations per class: {spc}, total iterations: {nc*spc}\n"
+            f"Start testing. Number of classes: {len(c)}, iterations per class: {spc}, total iterations: {len(c)*spc}\n"
         )
-        exp_start = datetime.now()
-        for class_idx, sample_id in product(range(nc), range(spc)):
+        exp_start = datetime.now()  # Exp time for grouping
+        for class_idx, sample_id in product(c, range(spc)):
             self._init_wandb(exp_start, class_idx, self._silent)  # Initialize Wandb run for logging
 
+            iter_start = datetime.now()
             w0_tensors, w0_images, w0_ys, w0_trials = self._generate_seeds(self._num_w0, class_idx)
 
             """
@@ -149,13 +150,13 @@ class NeuralTester:
                     columns=[metric.name for metric in self._objectives]
                     + [f"Genome_{i}" for i in range(self._optimizer.n_var)]
                     + ["Image"]
-                    + [f"Conf_{i}" for i in range(self._config.classes)],
+                    + [f"Conf_{i}" for i in self._restrict_classes],
                     data=[
                         [
                             *c.fitness,
                             *c.solution,
                             wandb.Image(c.data[0]),
-                            *c.data[1][:self._config.classes],
+                            *[c.data[1][i] for i in self._restrict_classes],
                         ]
                         for c in self._optimizer.best_candidates
                     ],
@@ -164,12 +165,14 @@ class NeuralTester:
             self._maybe_log(wnb_results)
 
             Xp, yp = self._optimizer.best_candidates[0].data
+            genome = self._optimizer.best_candidates[0].solution
             results = [
                 self._img_rgb.tolist(),
                 w0_ys[0].tolist(),
                 Xp.tolist(),
                 yp,
-                datetime.now() - exp_start,
+                datetime.now() - iter_start,
+                genome,
             ]
             self._df.append_row(results)
             self._optimizer.reset()  # Reset the learner for new candidate.
@@ -393,4 +396,4 @@ class NeuralTester:
         :returns: The predicted labels.
         """
         y_hat = self._sut(x)
-        return y_hat if not self._restrict_classes else y_hat[:,:self._config.classes]
+        return y_hat if self._restrict_classes is None else y_hat[:,self._restrict_classes]

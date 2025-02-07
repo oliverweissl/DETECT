@@ -9,7 +9,7 @@ class ExperimentConfig:
     samples_per_class: int  # How candidates should be searched for per class
     generations: int  # How many generations we search for candidates.
 
-    classes: int  # The amount of classes in the experiment.
+    classes: list[int]  # The classes in the experiment.
     save_to: Optional[str] = field(
         default=None
     )  # The name of the dataframe to save to, if None dont save.
