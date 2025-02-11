@@ -13,7 +13,7 @@ from torch import Tensor, nn
 from wandb import UsageError
 
 from ._experiment_config import ExperimentConfig
-from .criteria import CriteriaArguments, Criterion
+from .criteria import Criterion
 from .manipulator import CandidateList, Manipulator, MixCandidate
 from .optimizer import Learner
 from .persistence import DefaultDF
@@ -221,13 +221,7 @@ class NeuralTester:
                 np.array(
                     [
                         criterion.evaluate(
-                            default_args=CriteriaArguments(
-                                i1=self._img_rgb,
-                                i2=Xp,
-                                c1=c1,
-                                c2=c2,
-                                yp=yp,
-                            )
+                            images=[self._img_rgb, Xp], logits=yp, label_targets=[c1, c2]
                         )
                         for Xp, yp in zip(images, predictions_softmax)
                     ]
@@ -396,4 +390,4 @@ class NeuralTester:
         :returns: The predicted labels.
         """
         y_hat = self._sut(x)
-        return y_hat if self._restrict_classes is None else y_hat[:,self._restrict_classes]
+        return y_hat if self._restrict_classes is None else y_hat[:, self._restrict_classes]

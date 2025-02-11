@@ -1,11 +1,19 @@
+from typing import Union
+
 import torch
 import torch.nn as nn
-from typing import Union
+
 
 class MonteCarloDropoutScaffold(nn.Module):
     """Scaffold class to support Monte-Carlo dropout in inference."""
 
-    def __init__(self, model: nn.Module, dropout_prob:float = 0.1, mc_iter: int = 20, return_variance: bool = False) -> None:
+    def __init__(
+        self,
+        model: nn.Module,
+        dropout_prob: float = 0.1,
+        mc_iter: int = 20,
+        return_variance: bool = False,
+    ) -> None:
         """
         Initialize the model scaffold.
 
@@ -34,7 +42,9 @@ class MonteCarloDropoutScaffold(nn.Module):
         :param x: The input tensor.
         :returns: The prediction distribution.
         """
-        pred: torch.Tensor = torch.zeros((self._mc_iter, x.size()[0], self.fc.out_features)).to(x.device)
+        pred: torch.Tensor = torch.zeros((self._mc_iter, x.size()[0], self.fc.out_features)).to(
+            x.device
+        )
         self.dropout.train(True)
         for i in range(self._mc_iter):
             mx = self.features(x)

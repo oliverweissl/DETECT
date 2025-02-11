@@ -12,6 +12,7 @@ from src.criteria.image_comparison import CFrobeniusDistance, SSIMD2
 
 class ExperimentMetrics:
     """A class to extract metrics from df."""
+
     image_distance: list[float]  # Frobenius Distance between images.
     boundary_distance: list[float]  # Euclidean Distance towards boundary.
     ssim: list[float]  # SSIM between images.
@@ -20,7 +21,7 @@ class ExperimentMetrics:
     escape_ratios: list[float]  # Escape ratio of boundary search.
     coverage: list[float]  # Boundary coverage metric.
 
-    def __init__(self, df:pd.DataFrame, xs: list[str], ys: list[str]) -> None:
+    def __init__(self, df: pd.DataFrame, xs: list[str], ys: list[str]) -> None:
         """
         Initialize the object and extract metrics from df.
 
@@ -38,7 +39,12 @@ class ExperimentMetrics:
         """Extract SSIM between images."""
         ssim = SSIMD2()
 
-        ssims = [df[["X", x]].apply(lambda row: ssim._ssim_d2(row.iloc[0][:,:, None], row.iloc[1][:,:, None]), axis=1) for x in xs]
+        ssims = [
+            df[["X", x]].apply(
+                lambda row: ssim._ssim_d2(row.iloc[0][:, :, None], row.iloc[1][:, :, None]), axis=1
+            )
+            for x in xs
+        ]
         ssims = self._apply_strategy(pd.DataFrame(ssims), "max")
         self.ssim = ssims.tolist()
 
@@ -61,7 +67,6 @@ class ExperimentMetrics:
 
         cov = self._apply_strategy(pd.DataFrame(cov), "max")
         self.coverage = cov.tolist()
-
 
     def _apply_strategy(self, df: pd.DataFrame, strategy: str) -> pd.DataFrame:
         """Apply strategy for merging df columns."""
@@ -232,6 +237,7 @@ def format_cols(df: pd.DataFrame, reduce_channels: bool = False) -> pd.DataFrame
         elif "y" in c:
             df[c] = df[c].apply(lambda x: np.array(literal_eval(x)))
     return df
+
 
 def distance_to_boundary(arr: NDArray) -> float:
     arr = arr.squeeze()

@@ -13,7 +13,11 @@ class DefaultDF(pd.DataFrame):
         :param pairs: Whether we store frontier pairs or not.
         :param additional_fields: Additional fields to add to the dataframe.
         """
-        add = ["X_prime_1", "y_prime_1", "X_prime_2", "y_prime_2"] if pairs else ["X_prime", "y_prime"]
+        add = (
+            ["X_prime_1", "y_prime_1", "X_prime_2", "y_prime_2"]
+            if pairs
+            else ["X_prime", "y_prime"]
+        )
         af = additional_fields or []
         super().__init__(columns=["X", "y"] + add + ["runtime"] + af)
 

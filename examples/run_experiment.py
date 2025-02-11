@@ -112,7 +112,9 @@ def main(
 
     """Initialize components of the framework."""
     sut = torch.load(p) if isinstance(p, str) else p
-    sut = MonteCarloDropoutScaffold(sut) if validity_domain else sut  # If we test validity domain we use MC-Dropout UQ
+    sut = (
+        MonteCarloDropoutScaffold(sut) if validity_domain else sut
+    )  # If we test validity domain we use MC-Dropout UQ
     sut = sut.to(device)
     sut.eval()
 
@@ -146,7 +148,9 @@ def main(
             frontier_pairs=frontier_pairs,
             silent_wandb=True,
             config=conf,
-            restrict_classes=list(range(10))  # For these experiments we only consider the first 10 classes.
+            restrict_classes=list(
+                range(10)
+            ),  # For these experiments we only consider the first 10 classes.
         )
 
         # We start the testing procedure.
