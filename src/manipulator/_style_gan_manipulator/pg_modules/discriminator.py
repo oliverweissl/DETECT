@@ -1,30 +1,32 @@
 """Copied from https://github.com/autonomousvision/stylegan-xl/blob/main/pg_modules/discriminator.py"""
+
+import pickle
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.transforms import Normalize
-import pickle
 
 try:
+    from ..feature_networks.constants import VITS
     from ..training.diffaug import DiffAugment
     from ..training.networks_stylegan2 import FullyConnectedLayer
-    from ..feature_networks.constants import VITS
 except ImportError:
     from training.diffaug import DiffAugment
     from training.networks_stylegan2 import FullyConnectedLayer
     from feature_networks.constants import VITS
 
-from .blocks import conv2d, DownBlock, DownBlockPatch
+from .blocks import DownBlock, DownBlockPatch, conv2d
 from .projector import F_RandomProj
+
 
 class SingleDisc(nn.Module):
     def __init__(self, nc=None, ndf=None, start_sz=256, end_sz=8, head=None, patch=False):
         super().__init__()
 
         # midas channels
-        nfc_midas = {4: 512, 8: 512, 16: 256, 32: 128, 64: 64, 128: 64,
-                     256: 32, 512: 16, 1024: 8}
+        nfc_midas = {4: 512, 8: 512, 16: 256, 32: 128, 64: 64, 128: 64, 256: 32, 512: 16, 1024: 8}
 
         # interpolate for start sz that are not powers of two
         if start_sz not in nfc_midas.keys():
@@ -47,13 +49,12 @@ class SingleDisc(nn.Module):
 
         # Head if the initial input is the full modality
         if head:
-            layers += [conv2d(nc, nfc[256], 3, 1, 1, bias=False),
-                       nn.LeakyReLU(0.2, inplace=True)]
+            layers += [conv2d(nc, nfc[256], 3, 1, 1, bias=False), nn.LeakyReLU(0.2, inplace=True)]
 
         # Down Blocks
         DB = DownBlockPatch if patch else DownBlock
         while start_sz > end_sz:
-            layers.append(DB(nfc[start_sz], nfc[start_sz//2]))
+            layers.append(DB(nfc[start_sz], nfc[start_sz // 2]))
             start_sz = start_sz // 2
 
         layers.append(conv2d(nfc[end_sz], 1, 4, 1, 0, bias=False))
@@ -62,14 +63,25 @@ class SingleDisc(nn.Module):
     def forward(self, x, c):
         return self.main(x)
 
+
 class SingleDiscCond(nn.Module):
-    def __init__(self, nc=None, ndf=None, start_sz=256, end_sz=8, head=None, patch=False, c_dim=1000, cmap_dim=64, rand_embedding=False):
+    def __init__(
+        self,
+        nc=None,
+        ndf=None,
+        start_sz=256,
+        end_sz=8,
+        head=None,
+        patch=False,
+        c_dim=1000,
+        cmap_dim=64,
+        rand_embedding=False,
+    ):
         super().__init__()
         self.cmap_dim = cmap_dim
 
         # midas channels
-        nfc_midas = {4: 512, 8: 512, 16: 256, 32: 128, 64: 64, 128: 64,
-                     256: 32, 512: 16, 1024: 8}
+        nfc_midas = {4: 512, 8: 512, 16: 256, 32: 128, 64: 64, 128: 64, 256: 32, 512: 16, 1024: 8}
 
         # interpolate for start sz that are not powers of two
         if start_sz not in nfc_midas.keys():
@@ -92,28 +104,31 @@ class SingleDiscCond(nn.Module):
 
         # Head if the initial input is the full modality
         if head:
-            layers += [conv2d(nc, nfc[256], 3, 1, 1, bias=False),
-                       nn.LeakyReLU(0.2, inplace=True)]
+            layers += [conv2d(nc, nfc[256], 3, 1, 1, bias=False), nn.LeakyReLU(0.2, inplace=True)]
 
         # Down Blocks
         DB = DownBlockPatch if patch else DownBlock
         while start_sz > end_sz:
-            layers.append(DB(nfc[start_sz],  nfc[start_sz//2]))
+            layers.append(DB(nfc[start_sz], nfc[start_sz // 2]))
             start_sz = start_sz // 2
         self.main = nn.Sequential(*layers)
 
         self.cls = conv2d(nfc[end_sz], self.cmap_dim, 4, 1, 0, bias=False)
 
         # Pretrained Embeddings
-        embed_path = 'in_embeddings/tf_efficientnet_lite0.pkl'
-        with open(embed_path, 'rb') as f:
-            self.embed = pickle.Unpickler(f).load()['embed']
-        print(f'loaded imagenet embeddings from {embed_path}: {self.embed}')
+        embed_path = "in_embeddings/tf_efficientnet_lite0.pkl"
+        with open(embed_path, "rb") as f:
+            self.embed = pickle.Unpickler(f).load()["embed"]
+        print(f"loaded imagenet embeddings from {embed_path}: {self.embed}")
         if rand_embedding:
-            self.embed.__init__(num_embeddings=self.embed.num_embeddings, embedding_dim=self.embed.embedding_dim)
-            print(f'initialized embeddings with random weights')
+            self.embed.__init__(
+                num_embeddings=self.embed.num_embeddings, embedding_dim=self.embed.embedding_dim
+            )
+            print(f"initialized embeddings with random weights")
 
-        self.embed_proj = FullyConnectedLayer(self.embed.embedding_dim, self.cmap_dim, activation='lrelu')
+        self.embed_proj = FullyConnectedLayer(
+            self.embed.embedding_dim, self.cmap_dim, activation="lrelu"
+        )
 
     def forward(self, x, c):
         h = self.main(x)
@@ -123,6 +138,7 @@ class SingleDiscCond(nn.Module):
         out = (out * cmap).sum(dim=1, keepdim=True) * (1 / np.sqrt(self.cmap_dim))
 
         return out
+
 
 class MultiScaleD(nn.Module):
     def __init__(
@@ -147,7 +163,7 @@ class MultiScaleD(nn.Module):
         mini_discs = []
         for i, (cin, res) in enumerate(zip(self.disc_in_channels, self.disc_in_res)):
             start_sz = res if not patch else 16
-            mini_discs += [str(i), Disc(nc=cin, start_sz=start_sz, end_sz=8, patch=patch)],
+            mini_discs += ([str(i), Disc(nc=cin, start_sz=start_sz, end_sz=8, patch=patch)],)
 
         self.mini_discs = nn.ModuleDict(mini_discs)
 
@@ -159,15 +175,9 @@ class MultiScaleD(nn.Module):
         all_logits = torch.cat(all_logits, dim=1)
         return all_logits
 
+
 class ProjectedDiscriminator(torch.nn.Module):  # USED
-    def __init__(
-        self,
-        backbones,
-        diffaug=True,
-        interp224=True,
-        backbone_kwargs={},
-        **kwargs
-    ):
+    def __init__(self, backbones, diffaug=True, interp224=True, backbone_kwargs={}, **kwargs):
         super().__init__()
         self.backbones = backbones
         self.diffaug = diffaug
@@ -205,17 +215,17 @@ class ProjectedDiscriminator(torch.nn.Module):  # USED
         for bb_name, feat in self.feature_networks.items():
 
             # apply augmentation (x in [-1, 1])
-            x_aug = DiffAugment(x, policy='color,translation,cutout') if self.diffaug else x
+            x_aug = DiffAugment(x, policy="color,translation,cutout") if self.diffaug else x
 
             # transform to [0,1]
             x_aug = x_aug.add(1).div(2)
 
             # apply F-specific normalization
-            x_n = Normalize(feat.normstats['mean'], feat.normstats['std'])(x_aug)
+            x_n = Normalize(feat.normstats["mean"], feat.normstats["std"])(x_aug)
 
             # upsample if smaller, downsample if larger + VIT
             if self.interp224 or bb_name in VITS:
-                x_n = F.interpolate(x_n, 224, mode='bilinear', align_corners=False)
+                x_n = F.interpolate(x_n, 224, mode="bilinear", align_corners=False)
 
             # forward pass
             features = feat(x_n)

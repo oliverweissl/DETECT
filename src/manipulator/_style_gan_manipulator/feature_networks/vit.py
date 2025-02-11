@@ -1,8 +1,9 @@
+import math
+import types
+
+import timm
 import torch
 import torch.nn as nn
-import timm
-import types
-import math
 import torch.nn.functional as F
 
 
@@ -106,7 +107,9 @@ def _resize_pos_embed(self, posemb, gs_h, gs_w):
     gs_old = int(math.sqrt(len(posemb_grid)))
 
     posemb_grid = posemb_grid.reshape(1, gs_old, gs_old, -1).permute(0, 3, 1, 2)
-    posemb_grid = F.interpolate(posemb_grid, size=(gs_h, gs_w), mode="bilinear", align_corners=False)
+    posemb_grid = F.interpolate(
+        posemb_grid, size=(gs_h, gs_w), mode="bilinear", align_corners=False
+    )
     posemb_grid = posemb_grid.permute(0, 2, 3, 1).reshape(1, gs_h * gs_w, -1)
 
     posemb = torch.cat([posemb_tok, posemb_grid], dim=1)
@@ -169,9 +172,7 @@ def get_readout_oper(vit_features, features, use_readout, start_index=1):
     elif use_readout == "add":
         readout_oper = [AddReadout(start_index)] * len(features)
     elif use_readout == "project":
-        readout_oper = [
-            ProjectReadout(vit_features, start_index) for out_feat in features
-        ]
+        readout_oper = [ProjectReadout(vit_features, start_index) for out_feat in features]
     else:
         assert (
             False
@@ -287,9 +288,7 @@ def _make_vit_b16_backbone(
     # We inject this function into the VisionTransformer instances so that
     # we can use it with interpolated position embeddings without modifying the library source.
     pretrained.model.forward_flex = types.MethodType(forward_flex, pretrained.model)
-    pretrained.model._resize_pos_embed = types.MethodType(
-        _resize_pos_embed, pretrained.model
-    )
+    pretrained.model._resize_pos_embed = types.MethodType(_resize_pos_embed, pretrained.model)
 
     return pretrained
 
@@ -326,9 +325,7 @@ def _make_pretrained_deitb16_384(pretrained, use_readout="ignore", hooks=None):
 
 
 def _make_pretrained_deitb16_distil_384(pretrained, use_readout="ignore", hooks=None):
-    model = timm.create_model(
-        "vit_deit_base_distilled_patch16_384", pretrained=pretrained
-    )
+    model = timm.create_model("vit_deit_base_distilled_patch16_384", pretrained=pretrained)
 
     hooks = [2, 5, 8, 11] if hooks == None else hooks
     return _make_vit_b16_backbone(
@@ -358,12 +355,8 @@ def _make_vit_b_rn50_backbone(
         pretrained.model.blocks[hooks[0]].register_forward_hook(get_activation("1"))
         pretrained.model.blocks[hooks[1]].register_forward_hook(get_activation("2"))
     else:
-        pretrained.model.patch_embed.backbone.stages[0].register_forward_hook(
-            get_activation("1")
-        )
-        pretrained.model.patch_embed.backbone.stages[1].register_forward_hook(
-            get_activation("2")
-        )
+        pretrained.model.patch_embed.backbone.stages[0].register_forward_hook(get_activation("1"))
+        pretrained.model.patch_embed.backbone.stages[1].register_forward_hook(get_activation("2"))
 
     pretrained.model.blocks[hooks[2]].register_forward_hook(get_activation("3"))
     pretrained.model.blocks[hooks[3]].register_forward_hook(get_activation("4"))
@@ -419,12 +412,8 @@ def _make_vit_b_rn50_backbone(
             ),
         )
     else:
-        pretrained.layer1 = nn.Sequential(
-            nn.Identity(), nn.Identity(), nn.Identity()
-        )
-        pretrained.layer2 = nn.Sequential(
-            nn.Identity(), nn.Identity(), nn.Identity()
-        )
+        pretrained.layer1 = nn.Sequential(nn.Identity(), nn.Identity(), nn.Identity())
+        pretrained.layer2 = nn.Sequential(nn.Identity(), nn.Identity(), nn.Identity())
 
     pretrained.layer3 = nn.Sequential(
         readout_oper[2],
@@ -468,9 +457,7 @@ def _make_vit_b_rn50_backbone(
 
     # We inject this function into the VisionTransformer instances so that
     # we can use it with interpolated position embeddings without modifying the library source.
-    pretrained.model._resize_pos_embed = types.MethodType(
-        _resize_pos_embed, pretrained.model
-    )
+    pretrained.model._resize_pos_embed = types.MethodType(_resize_pos_embed, pretrained.model)
 
     return pretrained
 

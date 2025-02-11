@@ -65,47 +65,43 @@ REGNETS = [
 ]
 
 EFFNETS_IMAGENET = [
-    'tf_efficientnet_b0',
-    'tf_efficientnet_b1',
-    'tf_efficientnet_b2',
-    'tf_efficientnet_b3',
-    'tf_efficientnet_b4',
-    'tf_efficientnet_b0_ns',
+    "tf_efficientnet_b0",
+    "tf_efficientnet_b1",
+    "tf_efficientnet_b2",
+    "tf_efficientnet_b3",
+    "tf_efficientnet_b4",
+    "tf_efficientnet_b0_ns",
 ]
 
 EFFNETS_INCEPTION = [
-    'tf_efficientnet_lite0',
-    'tf_efficientnet_lite1',
-    'tf_efficientnet_lite2',
-    'tf_efficientnet_lite3',
-    'tf_efficientnet_lite4',
-    'tf_efficientnetv2_b0',
-    'tf_efficientnetv2_b1',
-    'tf_efficientnetv2_b2',
-    'tf_efficientnetv2_b3',
-    'efficientnet_b1',
-    'efficientnet_b1_pruned',
-    'efficientnet_b2_pruned',
-    'efficientnet_b3_pruned',
+    "tf_efficientnet_lite0",
+    "tf_efficientnet_lite1",
+    "tf_efficientnet_lite2",
+    "tf_efficientnet_lite3",
+    "tf_efficientnet_lite4",
+    "tf_efficientnetv2_b0",
+    "tf_efficientnetv2_b1",
+    "tf_efficientnetv2_b2",
+    "tf_efficientnetv2_b3",
+    "efficientnet_b1",
+    "efficientnet_b1_pruned",
+    "efficientnet_b2_pruned",
+    "efficientnet_b3_pruned",
 ]
 
 EFFNETS = EFFNETS_IMAGENET + EFFNETS_INCEPTION
 
 VITS_IMAGENET = [
-    'deit_tiny_distilled_patch16_224',
-    'deit_small_distilled_patch16_224',
-    'deit_base_distilled_patch16_224',
+    "deit_tiny_distilled_patch16_224",
+    "deit_small_distilled_patch16_224",
+    "deit_base_distilled_patch16_224",
 ]
 
-VITS_INCEPTION = [
-    'vit_base_patch16_224'
-]
+VITS_INCEPTION = ["vit_base_patch16_224"]
 
 VITS = VITS_IMAGENET + VITS_INCEPTION
 
-CLIP = [
-    'resnet50_clip'
-]
+CLIP = ["resnet50_clip"]
 
 ALL_MODELS = TORCHVISION + REGNETS + EFFNETS + VITS + CLIP
 
