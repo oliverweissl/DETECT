@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
+from ._criteria_kwargs import criteria_kwargs
+
 
 class Criterion(ABC):
     """A criterion, allowing to evaluate events."""
@@ -36,3 +38,13 @@ class Criterion(ABC):
         :returns: The name.
         """
         return self._name
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """
+        Automatically apply wrapper if function gets implemented.
+
+        :param kwargs: The KW-Args parsed.
+        """
+        super().__init_subclass__(**kwargs)
+        if "evaluate" in cls.__dict__:
+            cls.evaluate = criteria_kwargs(cls.evaluate)

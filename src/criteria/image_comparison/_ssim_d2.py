@@ -3,8 +3,8 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 from scipy.ndimage import gaussian_filter
+from torch import Tensor
 
-from .._criteria_arguments import CriteriaArguments
 from .._criterion import Criterion
 from ._prepare_tensor import prepare_tensor
 
@@ -42,17 +42,20 @@ class SSIMD2(Criterion):
     def evaluate(
         self,
         *,
-        default_args: CriteriaArguments,
+        images: list[Tensor],
         **_: Any,
     ) -> float:
         """
         Get structural similarity between two images as D_2 metric.
 
-        :param default_args: The default arguments parsed by the NeuralTeser.
+        :param images: Images to compare.
         :param _: Additional unused kwargs.
         :returns: SSIM score.
         """
-        i1, i2 = prepare_tensor(default_args.i1), prepare_tensor(default_args.i2)
+        assert len(images) == 2, f"ERROR, {self._name} requires 2 images, found {len(images)}"
+        images = [prepare_tensor(i) for i in images]
+        i1, i2 = images[0], images[1]
+
         assert (
             i1.shape == i2.shape
         ), f"Error: Both images need to be of same size ({i1.shape}, {i2.shape})."
@@ -85,7 +88,7 @@ class SSIMD2(Criterion):
 
         a1 = 2.0 * ux * uy + c1
         a2 = 2.0 * vxy + c2
-        b1 = ux ** 2.0 + uy ** 2.0 + c1
+        b1 = ux**2.0 + uy**2.0 + c1
         b2 = vx + vy + c2
 
         s1 = np.clip(a1 / b1, 0, 1)

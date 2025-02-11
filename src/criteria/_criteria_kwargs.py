@@ -1,10 +1,13 @@
 from typing import Callable
+
 from torch import Tensor
 
 DEFAULT_KWARGS = {
     "images": list[Tensor],  # A list of images for the Criteria calculation.
     "logits": Tensor,  # Predicted class probabilities.
-    "label_targets": list[int],  # The labels expected in the criterion, could be [true label] or [primary label, secondary label, ...]
+    "label_targets": list[
+        int
+    ],  # The labels expected in the criterion, could be [true label] or [primary label, secondary label, ...]
 }
 
 
@@ -15,6 +18,7 @@ def criteria_kwargs(func: Callable) -> Callable:
     :param func: The function to wrap around.
     :returns: The wrapped function.
     """
+
     def wrapper(*args, **kwargs) -> Callable:
         """
         Checking kwargs and types.
@@ -22,6 +26,8 @@ def criteria_kwargs(func: Callable) -> Callable:
         :param args: The arguments to check.
         :param kwargs: The keyword arguments to check.
         :returns: The parameterized function.
+        :raises KeyError: If function has an invalid kwarg.
+        :raises TypeError: If function has an invalid type for one of the kwargs.
         """
         ikw = set(kwargs.keys()) - DEFAULT_KWARGS.keys()
         if ikw:  # Invalid Keyword arguments.
@@ -30,6 +36,9 @@ def criteria_kwargs(func: Callable) -> Callable:
         for key, value in kwargs.items():
             expected_type = DEFAULT_KWARGS.get(key)
             if expected_type and not isinstance(value, expected_type):
-                raise TypeError(f"Argument {key} in function {func.__name__} must be of type {expected_type}, found {type(value)}")
+                raise TypeError(
+                    f"Argument {key} in function {func.__name__} must be of type {expected_type}, found {type(value)}"
+                )
         return func(*args, **kwargs)
+
     return wrapper

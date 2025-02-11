@@ -1,6 +1,7 @@
 from typing import Any
 
-from .._criteria_arguments import CriteriaArguments
+from torch import Tensor
+
 from .._criterion import Criterion
 
 
@@ -9,19 +10,17 @@ class IsMisclassified(Criterion):
 
     _name: str = "IsMisclassified"
 
-    def evaluate(self, *, default_args: CriteriaArguments, **_: Any) -> float:
+    def evaluate(self, *, logits: Tensor, label_targets: list[int], **_: Any) -> float:
         """
         Check if a prediction is incorrect.
 
         This functions assumes input range of [0, 1].
 
-        :param default_args: The default args parsed by the NeuralTester.
+        :param logits: Tensor of predictions.
+        :param label_targets: Label targets.
         :param _: Unused kwargs.
         :returns: The value.
         """
-        result = (
-            default_args.c1 == default_args.yp.argmax().item()
-            if self._inverse
-            else default_args.c1 != default_args.yp.argmax().item()
-        )
+        c1 = label_targets[0]
+        result = c1 == logits.argmax().item() if self._inverse else c1 != logits.argmax().item()
         return result

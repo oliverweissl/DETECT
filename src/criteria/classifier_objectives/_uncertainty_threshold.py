@@ -1,5 +1,6 @@
 from typing import Any
-from .._criteria_arguments import CriteriaArguments
+
+from torch import Tensor
 
 from .._criterion import Criterion
 
@@ -22,13 +23,14 @@ class UncertaintyThreshold(Criterion):
         self._threshold = threshold
         self._absolute = absolute
 
-    def evaluate(self, *, default_args: CriteriaArguments, **_: Any) -> float:
+    def evaluate(self, *, logits: Tensor, **_: Any) -> float:
         """
         Calculate the accuracy from prediction probabilities.
 
-        :param default_args: Arguments passed to the current evaluation.
+        :param logits: Prediction probabilities.
+        :param _: Unused kwargs.
         :return: The distance to the uncertainty threshold.
         """
-        ypm = default_args.yp.max()
+        ypm = logits.max()
         dist = self._threshold - ypm.item()
         return abs(dist) if self._absolute else dist

@@ -1,6 +1,7 @@
 from typing import Any, Optional
 
-from .._criteria_arguments import CriteriaArguments
+from torch import Tensor
+
 from .._criterion import Criterion
 
 
@@ -20,25 +21,25 @@ class NaiveConfidenceBalance(Criterion):
         super().__init__(inverse=inverse)
         self._target_primary = target_primary
 
-    def evaluate(self, *, default_args: CriteriaArguments, **_: Any) -> float:
+    def evaluate(self, *, logits: Tensor, label_targets: list[int], **_: Any) -> float:
         """
         Calculate the confidence balance of two confidence values.
 
         This functions assumes input range of [0, 1].
 
-        :param default_args: The default args parsed by the NeuralTester.
+        :param logits: The predicted logits.
+        :param label_targets: The target labels in question.
         :param _: Unused kwargs.
         :returns: The value.
         """
         # TODO: investigate to improve this since |d| makes this non-linear.
-        s = default_args.y1p + default_args.y2p
-        d = abs(default_args.y1p - default_args.y2p)
+        c1, c2 = label_targets[:2]
+        y1p, y2p = logits[c1], logits[c2]
+
+        s = y1p + y2p
+        d = abs(y1p - y2p)
 
         if self._target_primary is None:
             return abs(self._inverse.real - d / s)
         else:
-            return abs(
-                self._inverse.real
-                - (default_args.y2p if self._target_primary else default_args.y1p)
-                - d / s
-            )
+            return abs(self._inverse.real - (y2p if self._target_primary else y1p) - d / s)

@@ -2,8 +2,8 @@ from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
+from torch import Tensor
 
-from .._criteria_arguments import CriteriaArguments
 from .._criterion import Criterion
 from ._prepare_tensor import prepare_tensor
 
@@ -13,15 +13,18 @@ class CFrobeniusDistance(Criterion):
 
     _name: str = "CFrobDistance"
 
-    def evaluate(self, *, default_args: CriteriaArguments, **_: Any) -> float:
+    def evaluate(self, *, images: list[Tensor], **_: Any) -> float:
         """
         Calculate the normalized frobenius distance between two tensors that range [0,1].
 
-        :param default_args: The default arguments parsed by the NeuralTester-
+        :param images: Images to compare.
         :param _: Additional unused kwargs.
         :returns: The distance.
         """
-        i1, i2 = prepare_tensor(default_args.i1), prepare_tensor(default_args.i2)
+        assert len(images) == 2, f"ERROR, {self._name} requires 2 images, found {len(images)}"
+        images = [prepare_tensor(i) for i in images]
+        i1, i2 = images[0], images[1]
+
         ub = self._frob(np.ones(i1.shape[:-1]))
         mean_fn = (
             sum([self._frob(i1[..., j] - i2[..., j]) for j in range(i1.shape[-1])]) / i1.shape[-1]
