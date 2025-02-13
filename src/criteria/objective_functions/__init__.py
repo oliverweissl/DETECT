@@ -1,5 +1,6 @@
 """A collection of criteria used for search based optimization methods."""
 
+from ._archive_sparsity import ArchiveSparsity
 from ._dynamic_confidence_balance import DynamicConfidenceBalance
 from ._is_misclassified import IsMisclassified
 from ._naive_confidence_balance import NaiveConfidenceBalance
@@ -10,4 +11,5 @@ __all__ = [
     "NaiveConfidenceBalance",
     "DynamicConfidenceBalance",
     "IsMisclassified",
+    "ArchiveSparsity",
 ]

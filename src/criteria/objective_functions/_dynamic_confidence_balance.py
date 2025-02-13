@@ -34,8 +34,8 @@ class DynamicConfidenceBalance(Criterion):
         :returns: The value.
         """
         c1 = label_targets[0]  # The primary class
-
-        yp_arr = logits.detach().cpu().numpy().copy()
+        logits = logits.detach().cpu().numpy()
+        yp_arr = logits.copy()
         y = np.delete(yp_arr, c1)
         s = logits[c1] + y.max()
         d = abs(logits[c1] - y.max())

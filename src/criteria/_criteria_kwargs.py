@@ -1,13 +1,15 @@
 from typing import Callable
 
+import numpy as np
 from torch import Tensor
 
 DEFAULT_KWARGS = {
-    "images": list[Tensor],  # A list of images for the Criteria calculation.
-    "logits": Tensor,  # Predicted class probabilities.
-    "label_targets": list[
-        int
-    ],  # The labels expected in the criterion, could be [true label] or [primary label, secondary label, ...]
+    "images": (list, Tensor),  # A list of images for the Criteria calculation.
+    "solution_archive": (list, Tensor),  # An archive of other solutions for comparison.
+    "logits": (Tensor,),  # Predicted class probabilities.
+    "label_targets": (list, int),  # Could be [true label] or [primary label, secondary label, ...]
+    "genome_target": (np.ndarray,),
+    "genome_archive": (list, np.ndarray),
 }
 
 
@@ -35,7 +37,12 @@ def criteria_kwargs(func: Callable) -> Callable:
 
         for key, value in kwargs.items():
             expected_type = DEFAULT_KWARGS.get(key)
-            if expected_type and not isinstance(value, expected_type):
+            elem_cond = (
+                True
+                if len(expected_type) == 1
+                else all(isinstance(item, expected_type[1]) for item in value)
+            )
+            if expected_type and not isinstance(value, expected_type[0]) and not elem_cond:
                 raise TypeError(
                     f"Argument {key} in function {func.__name__} must be of type {expected_type}, found {type(value)}"
                 )
