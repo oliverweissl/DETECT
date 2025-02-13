@@ -21,6 +21,8 @@ from src.defaults.objective_configs import (
     VALIDITY_BOUNDARY_TESTING,
 )
 from src.manipulator import StyleGANManipulator
+from src.criteria.objective_functions import DynamicConfidenceBalance, ArchiveSparsity
+from src.criteria.image_comparison import CFrobeniusDistance, EuclideanDistance
 from models.mcd_scaffold import MonteCarloDropoutScaffold
 
 from torchvision.models import wide_resnet50_2
@@ -34,6 +36,11 @@ OBJECTIVES = {
     "tat": TARGETED_ADVERSARIAL_TESTING,
     "ds": DIVERSITY_SAMPLING,
     "vbt": VALIDITY_BOUNDARY_TESTING,
+    "ubtn": [DynamicConfidenceBalance(), ArchiveSparsity(metric=CFrobeniusDistance())],
+    "ubtgn": [
+        DynamicConfidenceBalance(),
+        ArchiveSparsity(metric=EuclideanDistance(), on_genomes=True),
+    ],
 }
 
 MODEL_COMBINATIONS = {
@@ -92,15 +99,15 @@ def main(
     Run the experiments done in the paper.
 
     :param objective: The objective for optimization.
-    :param dataset: The dataset for to test with.
-    :param predictor: The predictor to test.
+    :param dataset: The dataset to test with.
+    :param predictor: The predictor to test (SUT).
     :param generator: The generator to generate test cases.
     :param mix_dims: The dimensions to mix in the generator.
     :param generations: The number of generations to run the optimization.
     :param interpolate: Whether to interpolate the style layers.
     :param frontier_pairs: Whether to use the frontier pairs.
     :param validity_domain: Whether to check the boundary towards the validity domain or class boundaries.
-    :param run_experiments_separately: Whether to run the experiments separately (useful for long runs to avoid crashes).
+    :param run_experiments_separately: Run the experiments separately (useful for long runs to avoid crashes).
     """
 
     # Define the configurations for our experiments.
@@ -112,9 +119,8 @@ def main(
 
     """Initialize components of the framework."""
     sut = torch.load(p) if isinstance(p, str) else p
-    sut = (
-        MonteCarloDropoutScaffold(sut) if validity_domain else sut
-    )  # If we test validity domain we use MC-Dropout UQ
+    # If we test validity domain we use MC-Dropout UQ
+    sut = MonteCarloDropoutScaffold(sut) if validity_domain else sut
     sut = sut.to(device)
     sut.eval()
 
@@ -127,7 +133,8 @@ def main(
         num_objectives=len(metrics),
     )
     class_collection = [[i] for i in range(10)] if run_experiments_separately else [list(range(10))]
-    seperately_named = [f"_{i}" for i in range(10)] if run_experiments_separately else ""
+    seperately_named = [f"_{i}" for i in range(10)] if run_experiments_separately else [""] * 10
+
     for clss, nm in zip(class_collection, seperately_named):
         """Make a config (used for logging and more)."""
         conf = ExperimentConfig(

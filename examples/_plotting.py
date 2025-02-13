@@ -2,8 +2,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import gaussian_kde
 
+
 def plot_compare_images_with_confidences(im1, im2, y, yp) -> None:
-    fig, ax = plt.subplots(2, 2, figsize=(10, 7), gridspec_kw={'height_ratios': [2, 1]})
+    fig, ax = plt.subplots(2, 2, figsize=(10, 7), gridspec_kw={"height_ratios": [2, 1]})
     ax[0, 0].imshow(im1)
     ax[0, 1].imshow(im2)
     classes = range(len(y))
@@ -11,15 +12,15 @@ def plot_compare_images_with_confidences(im1, im2, y, yp) -> None:
     ax[1, 1].bar(classes, yp, color="darkgreen")
 
     for i in range(2):
-        ax[0, i].axis('off')
+        ax[0, i].axis("off")
 
         ax[1, i].grid()
-        ax[1, i].set_ylim([0,1])
+        ax[1, i].set_ylim([0, 1])
         ax[1, i].set_xticks(range(10))
         ax[1, i].set_xlabel("Classes")
         ax[1, i].set_xticklabels(range(10))
-    ax[1,0].set_ylabel("SUT Confidence")
-    ax[1,1].set_yticklabels([])
+    ax[1, 0].set_ylabel("SUT Confidence")
+    ax[1, 1].set_yticklabels([])
 
     plt.tight_layout()
     plt.subplots_adjust(hspace=0.1, wspace=0)
@@ -32,7 +33,9 @@ def plot_compare_image_differences(im1, im2, greyscale: bool = False) -> None:
     h = 1 if greyscale else 3
     diff = diff.sum(axis=-1, keepdims=True) if greyscale else diff
 
-    fig, ax = plt.subplots(1, h+1, figsize=(4*h+0.2, 4), gridspec_kw={'width_ratios': [1]*h + [0.05]})
+    fig, ax = plt.subplots(
+        1, h + 1, figsize=(4 * h + 0.2, 4), gridspec_kw={"width_ratios": [1] * h + [0.05]}
+    )
     for i in range(h):
         h = ax[i].imshow(diff[:, :, i], cmap="seismic", vmin=-1, vmax=1)
         ax[i].axis("off")
@@ -115,7 +118,13 @@ def plot_manifold_analysis(
     plt.show()
 
 
-def plot_compare_metric(*experiments: list[float], exp_labels: list[str], tick_labels: list[str], name: str, log: bool = False) -> None:
+def plot_compare_metric(
+    *experiments: list[float],
+    exp_labels: list[str],
+    tick_labels: list[str],
+    name: str,
+    log: bool = False
+) -> None:
     """
     Compare metric across experiments and datasets.
 
@@ -137,22 +146,26 @@ def plot_compare_metric(*experiments: list[float], exp_labels: list[str], tick_l
             if len(exp) > i:
                 positions[j].append(base)
                 base += 0.5
-        middle.append((prev_base + base)/2)
-        base, prev_base = base+1, base+1
+        middle.append((prev_base + base) / 2 - 0.25)
+        base, prev_base = base + 1, base + 1
 
     boxpl_args = dict(widths=0.495, patch_artist=True, medianprops=dict(color="red"))
-    fig, ax = plt.subplots(figsize=(5,5))
+    fig, ax = plt.subplots(figsize=(5, 5))
     for i, exp in enumerate(experiments):
-        ax.boxplot(exp, positions=positions[i], boxprops=dict(facecolor=colors[i], color=colors[i]), **boxpl_args)
+        ax.boxplot(
+            exp,
+            positions=positions[i],
+            boxprops=dict(facecolor=colors[i], color=colors[i]),
+            **boxpl_args
+        )
         ax.plot([], color=colors[i], label=exp_labels[i], linewidth=8)
 
     ax.set_ylabel(name)
     ax.set_xticks(middle)
-    ax.set_xticklabels(tick_labels)
+    ax.set_xticklabels(tick_labels, rotation=25)
     if log:
         ax.set_yscale("log")
 
     ax.legend()
     ax.grid()
     plt.show()
-
