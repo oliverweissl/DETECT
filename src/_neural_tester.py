@@ -216,14 +216,21 @@ class NeuralTester:
         """We predict the label from the mixed images."""
         predictions: Tensor = self._predict(torch.stack(images))
         predictions_softmax = self._softmax(predictions)
+
+        # TODO: maybe have candidates be the input for criterion evaluation.
         fitness = tuple(
             [
                 np.array(
                     [
                         criterion.evaluate(
-                            images=[self._img_rgb, Xp], logits=yp, label_targets=[c1, c2]
+                            images=[self._img_rgb, Xp],
+                            logits=yp,
+                            label_targets=[c1, c2],
+                            solution_archive=[i for i in images if not torch.equal(i, Xp)],
+                            genome_archive=[e for k, e in enumerate(sm_weights_arr) if k != j],
+                            genome_target=sm_weights_arr[j],
                         )
-                        for Xp, yp in zip(images, predictions_softmax)
+                        for j, (Xp, yp) in enumerate(zip(images, predictions_softmax))
                     ]
                 )
                 for criterion in self._objectives
