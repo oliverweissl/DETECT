@@ -9,7 +9,7 @@ import torch
 
 @dataclass
 class MixCandidate:
-    """A simple container for candidate elements used in style mixing."""
+    """A simple container for candidate elements used in style mixing/ interpolation."""
 
     label: int  # The class label of the candidate.
     is_w0: bool = False  # Whether candidate is used for w0 calculation.

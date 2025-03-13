@@ -5,9 +5,10 @@
 **/_*.ipynb
 *.json*
 __pycache__
-datasets/*.zip
-**/_artifacts/
-**/artifacts/
+
 **/figures/
 **/*data*/
-wandb/
+**/_artifacts/
+**/artifacts/
+**/wandb/
+**/results/

@@ -4,8 +4,9 @@ import numpy as np
 import torch
 from torch import Tensor
 
+from src.manipulator._style_gan_manipulator._mix_candidate import CandidateList
+
 from .._manipulator import Manipulator
-from .._mix_candidate import CandidateList
 from . import dnnlib
 from ._load_stylegan import load_stylegan
 from .torch_utils.ops import upfirdn2d

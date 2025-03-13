@@ -39,7 +39,7 @@ OBJECTIVES = {
     "ubtn": [DynamicConfidenceBalance(), ArchiveSparsity(metric=CFrobeniusDistance())],
     "ubtgn": [
         DynamicConfidenceBalance(),
-        ArchiveSparsity(metric=EuclideanDistance(), on_genomes=True),
+        ArchiveSparsity(metric=EuclideanDistance(normalize=True), on_genomes=True),
     ],
 }
 
@@ -199,7 +199,7 @@ if __name__ == "__main__":
         "--objective",
         help="Objective of the testing",
         type=str,
-        choices=["ubt", "tbt", "uat", "tat", "ds"],
+        choices=["ubt", "tbt", "uat", "tat", "ds", "ubtgn"],
     )
     parser.add_argument(
         "--generations", help="Number of generations to run for.", type=int, default=150

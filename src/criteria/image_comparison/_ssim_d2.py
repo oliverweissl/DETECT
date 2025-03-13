@@ -65,7 +65,7 @@ class SSIMD2(Criterion):
 
     def _ssim_d2(self, i1: NDArray, i2: NDArray) -> float:
         """
-        Compute the SSIM D2 metric.
+        Compute the SSIM D2 metric https://ece.uwaterloo.ca/~z70wang/publications/TIP_SSIM_MathProperties.pdf.
 
         :param i1: First image.
         :param i2: Second image.

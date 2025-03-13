@@ -1,9 +1,11 @@
+from typing import Optional
+
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import gaussian_kde
 
 
-def plot_compare_images_with_confidences(im1, im2, y, yp) -> None:
+def plot_compare_images_with_confidences(im1, im2, y, yp, save_as:str = None) -> None:
     fig, ax = plt.subplots(2, 2, figsize=(10, 7), gridspec_kw={"height_ratios": [2, 1]})
     ax[0, 0].imshow(im1)
     ax[0, 1].imshow(im2)
@@ -16,34 +18,62 @@ def plot_compare_images_with_confidences(im1, im2, y, yp) -> None:
 
         ax[1, i].grid()
         ax[1, i].set_ylim([0, 1])
+        ax[1, i].set_xlim([-0.5, 9.5])
         ax[1, i].set_xticks(range(10))
-        ax[1, i].set_xlabel("Classes")
         ax[1, i].set_xticklabels(range(10))
+
+    ax[1, 0].set_xlabel(r"Pred Classes $X$")
+    ax[1, 1].set_xlabel(r"Pred Classes $X'$")
     ax[1, 0].set_ylabel("SUT Confidence")
     ax[1, 1].set_yticklabels([])
 
     plt.tight_layout()
-    plt.subplots_adjust(hspace=0.1, wspace=0)
-    plt.show()
+    plt.subplots_adjust(hspace=0.05, wspace=0)
+    if save_as is not None:
+        plt.savefig(f"{save_as}.pdf", bbox_inches="tight", dpi=200)
+    else:
+        plt.show()
+
+def plot_compare_images(im1, im2, save_as:str = None) -> None:
+    fig, ax = plt.subplots(1, 2, figsize=(10, 7))
+    ax[0].imshow(im1)
+    ax[1].imshow(im2)
+
+    for i in range(2):
+        ax[i].axis("off")
+
+    plt.subplots_adjust(hspace=0.05, wspace=0.05)
+    if save_as is not None:
+        plt.savefig(f"figures/{save_as}.png", bbox_inches="tight", dpi=200)
+    else:
+        plt.tight_layout()
+        plt.show()
 
 
-def plot_compare_image_differences(im1, im2, greyscale: bool = False) -> None:
+
+def plot_compare_image_differences(im1, im2, greyscale: bool = False, save_as: str = None) -> None:
     diff = im1 - im2
 
     h = 1 if greyscale else 3
     diff = diff.sum(axis=-1, keepdims=True) if greyscale else diff
 
     fig, ax = plt.subplots(
-        1, h + 1, figsize=(4 * h + 0.2, 4), gridspec_kw={"width_ratios": [1] * h + [0.05]}
-    )
+        1, h + 1, figsize=(4 * h + 0.2, 4), gridspec_kw={"width_ratios": [1] * h + [0.05], "wspace":-0.1})
+    cspec = "RGB"
     for i in range(h):
         h = ax[i].imshow(diff[:, :, i], cmap="seismic", vmin=-1, vmax=1)
-        ax[i].axis("off")
+        ax[i].set_xticks([])
+        ax[i].set_yticks([])
+        ax[i].set_xlabel(cspec[i], fontsize=24)
 
     cbar = plt.colorbar(h, cax=ax[-1])
-    plt.tight_layout()
-    plt.subplots_adjust(hspace=0.1, wspace=0.05)
-    plt.show()
+    cbar.ax.tick_params(labelsize=24)
+
+    if save_as is not None:
+        plt.savefig(f"figures/{save_as}.png", bbox_inches="tight", dpi=200)
+    else:
+        plt.tight_layout()
+        plt.show()
 
 
 def plot_manifold_analysis(
@@ -123,7 +153,8 @@ def plot_compare_metric(
     exp_labels: list[str],
     tick_labels: list[str],
     name: str,
-    log: bool = False
+    log: bool = False,
+    save_as: Optional[str] = None,
 ) -> None:
     """
     Compare metric across experiments and datasets.
@@ -133,6 +164,7 @@ def plot_compare_metric(
     :param tick_labels: The labeles for the x_ticks (i.e Datasets).
     :param name: The name of the metric (used as y_label).
     :param log: Whether to log scale on the y axis.
+    :param save_as: Where to save the figure.
     """
     colors = ["green", "brown", "blue"]
 
@@ -166,6 +198,9 @@ def plot_compare_metric(
     if log:
         ax.set_yscale("log")
 
-    ax.legend()
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=3)
     ax.grid()
-    plt.show()
+    if save_as:
+        plt.savefig(f"{save_as}.pdf", bbox_inches="tight")
+    else:
+        plt.show()

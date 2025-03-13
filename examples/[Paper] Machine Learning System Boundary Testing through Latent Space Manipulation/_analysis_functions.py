@@ -15,11 +15,13 @@ class ExperimentMetrics:
 
     image_distance: list[float]  # Frobenius Distance between images.
     boundary_distance: list[float]  # Euclidean Distance towards boundary.
-    ssim: list[float]  # SSIM between images.
     lap_variance: list[float]  # Laplacian variance on image differences.
 
     escape_ratios: list[float]  # Escape ratio of boundary search.
     coverage: list[float]  # Boundary coverage metric.
+
+    runtime: list[float]
+    runtime_norm: list[float]
 
     def __init__(self, df: pd.DataFrame, xs: list[str], ys: list[str]) -> None:
         """
@@ -35,18 +37,6 @@ class ExperimentMetrics:
         f_dist = [d.apply(im_comp) for d in diffs]
         f_dist = self._apply_strategy(pd.DataFrame(f_dist), "min")
         self.image_distance = f_dist.tolist()
-
-        """Extract SSIM between images."""
-        ssim = SSIMD2()
-
-        ssims = [
-            df[["X", x]].apply(
-                lambda row: ssim._ssim_d2(row.iloc[0][:, :, None], row.iloc[1][:, :, None]), axis=1
-            )
-            for x in xs
-        ]
-        ssims = self._apply_strategy(pd.DataFrame(ssims), "max")
-        self.ssim = ssims.tolist()
 
         """Extract boundary distance."""
         b_dists = [df[y].apply(distance_to_boundary) for y in ys]
@@ -68,6 +58,18 @@ class ExperimentMetrics:
         cov = self._apply_strategy(pd.DataFrame(cov), "max")
         self.coverage = cov.tolist()
 
+        runt = df["runtime"]
+        runt_norm = runt.copy()
+        if isinstance(runt[0], str):
+            runt = runt.apply(lambda x: _convert_to_seconds(x))
+            runt_norm = runt.copy()
+        if "iter" in df.columns:
+            runt_norm = (runt / df["iter"]).apply(lambda x: x * 15_000)  # Normalize toward budget
+
+        self.runtime_norm = runt_norm.tolist()
+        self.runtime = runt.tolist()
+
+
     def _apply_strategy(self, df: pd.DataFrame, strategy: str) -> pd.DataFrame:
         """Apply strategy for merging df columns."""
         if strategy == "min":
@@ -85,6 +87,10 @@ def softmax(x: Union[list, NDArray]) -> NDArray:
     if isinstance(x, list):
         x = np.array(x)
     return (np.e**x) / np.sum(np.e**x)
+
+def cohens_d(x, y) -> float:
+    """Calculate CohensD for effect size analysis."""
+    return (np.mean(x) - np.mean(y)) / (np.sqrt((np.std(x) ** 2 + np.std(y) ** 2)/2))
 
 
 def transform_image(x: Union[str, NDArray]) -> NDArray:
@@ -167,6 +173,11 @@ def filter_for_classes(
     elements = elements + [class_information[mask]] if filter_class_information else elements
     return elements
 
+def _convert_to_seconds(elem: str) -> float:
+    *_, time = elem.split(" ")
+    h, m, s = time.split(":")
+    s = float(s) + 60 * int(m) + 3600*int(h)
+    return s
 
 def get_boundary_stats(y1: pd.Series, y2: pd.Series) -> tuple[NDArray, float]:
     """
@@ -236,8 +247,9 @@ def format_cols(df: pd.DataFrame, reduce_channels: bool = False) -> pd.DataFrame
             df[c] = df[c].apply(lambda x: reduce_dim(np.array(literal_eval(x)), reduce_channels))
         elif "y" in c:
             df[c] = df[c].apply(lambda x: np.array(literal_eval(x)))
+        elif "genome" in c:
+            df[c] = df[c].apply(lambda x: np.array([float(v) for v in x[1:-1].split(" ") if v]))
     return df
-
 
 def distance_to_boundary(arr: NDArray) -> float:
     arr = arr.squeeze()

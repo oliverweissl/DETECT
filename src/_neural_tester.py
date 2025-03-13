@@ -178,6 +178,7 @@ class NeuralTester:
             self._optimizer.reset()  # Reset the learner for new candidate.
             logging.info("\tReset learner!")
 
+        logging.info("Saving Experiments to DF")
         if self._config.save_to is not None:
             self._df.to_csv(f"{self._config.save_to}.csv", index=False)
 
@@ -218,24 +219,26 @@ class NeuralTester:
         predictions_softmax = self._softmax(predictions)
 
         # TODO: maybe have candidates be the input for criterion evaluation.
-        fitness = tuple(
-            [
-                np.array(
-                    [
-                        criterion.evaluate(
-                            images=[self._img_rgb, Xp],
-                            logits=yp,
-                            label_targets=[c1, c2],
-                            solution_archive=[i for i in images if not torch.equal(i, Xp)],
-                            genome_archive=[e for k, e in enumerate(sm_weights_arr) if k != j],
-                            genome_target=sm_weights_arr[j],
-                        )
-                        for j, (Xp, yp) in enumerate(zip(images, predictions_softmax))
-                    ]
-                )
-                for criterion in self._objectives
-            ]
-        )
+        fitness = []
+        for j, (Xp, yp) in enumerate(zip(images, predictions_softmax)):
+            sol_arch = [i for i in images if not torch.equal(i, Xp)]
+            gen_arch = [e for k, e in enumerate(sm_weights_arr) if k != j]
+            im, lt, gt = [self._img_rgb, Xp], [c1, c2], sm_weights_arr[j]
+
+            fitness.append(
+                [
+                    criterion.evaluate(
+                        images=im,
+                        logits=yp,
+                        label_targets=lt,
+                        genome_target=gt,
+                        solution_archive=sol_arch,
+                        genome_archive=gen_arch,
+                    )
+                    for criterion in self._objectives
+                ]
+            )
+        fitness = tuple(map(np.array, zip(*fitness)))
 
         # Logging Operations
         results = {}
