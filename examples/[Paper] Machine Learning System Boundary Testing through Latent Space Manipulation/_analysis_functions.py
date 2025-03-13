@@ -69,7 +69,6 @@ class ExperimentMetrics:
         self.runtime_norm = runt_norm.tolist()
         self.runtime = runt.tolist()
 
-
     def _apply_strategy(self, df: pd.DataFrame, strategy: str) -> pd.DataFrame:
         """Apply strategy for merging df columns."""
         if strategy == "min":
@@ -88,9 +87,10 @@ def softmax(x: Union[list, NDArray]) -> NDArray:
         x = np.array(x)
     return (np.e**x) / np.sum(np.e**x)
 
+
 def cohens_d(x, y) -> float:
     """Calculate CohensD for effect size analysis."""
-    return (np.mean(x) - np.mean(y)) / (np.sqrt((np.std(x) ** 2 + np.std(y) ** 2)/2))
+    return (np.mean(x) - np.mean(y)) / (np.sqrt((np.std(x) ** 2 + np.std(y) ** 2) / 2))
 
 
 def transform_image(x: Union[str, NDArray]) -> NDArray:
@@ -173,11 +173,13 @@ def filter_for_classes(
     elements = elements + [class_information[mask]] if filter_class_information else elements
     return elements
 
+
 def _convert_to_seconds(elem: str) -> float:
     *_, time = elem.split(" ")
     h, m, s = time.split(":")
-    s = float(s) + 60 * int(m) + 3600*int(h)
+    s = float(s) + 60 * int(m) + 3600 * int(h)
     return s
+
 
 def get_boundary_stats(y1: pd.Series, y2: pd.Series) -> tuple[NDArray, float]:
     """
@@ -250,6 +252,7 @@ def format_cols(df: pd.DataFrame, reduce_channels: bool = False) -> pd.DataFrame
         elif "genome" in c:
             df[c] = df[c].apply(lambda x: np.array([float(v) for v in x[1:-1].split(" ") if v]))
     return df
+
 
 def distance_to_boundary(arr: NDArray) -> float:
     arr = arr.squeeze()

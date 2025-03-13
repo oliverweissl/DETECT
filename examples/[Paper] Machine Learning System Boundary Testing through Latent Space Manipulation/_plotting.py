@@ -5,7 +5,7 @@ import numpy as np
 from scipy.stats import gaussian_kde
 
 
-def plot_compare_images_with_confidences(im1, im2, y, yp, save_as:str = None) -> None:
+def plot_compare_images_with_confidences(im1, im2, y, yp, save_as: str = None) -> None:
     fig, ax = plt.subplots(2, 2, figsize=(10, 7), gridspec_kw={"height_ratios": [2, 1]})
     ax[0, 0].imshow(im1)
     ax[0, 1].imshow(im2)
@@ -34,7 +34,8 @@ def plot_compare_images_with_confidences(im1, im2, y, yp, save_as:str = None) ->
     else:
         plt.show()
 
-def plot_compare_images(im1, im2, save_as:str = None) -> None:
+
+def plot_compare_images(im1, im2, save_as: str = None) -> None:
     fig, ax = plt.subplots(1, 2, figsize=(10, 7))
     ax[0].imshow(im1)
     ax[1].imshow(im2)
@@ -44,11 +45,10 @@ def plot_compare_images(im1, im2, save_as:str = None) -> None:
 
     plt.subplots_adjust(hspace=0.05, wspace=0.05)
     if save_as is not None:
-        plt.savefig(f"figures/{save_as}.png", bbox_inches="tight", dpi=200)
+        plt.savefig(f"{save_as}.pdf", bbox_inches="tight", dpi=200)
     else:
         plt.tight_layout()
         plt.show()
-
 
 
 def plot_compare_image_differences(im1, im2, greyscale: bool = False, save_as: str = None) -> None:
@@ -58,7 +58,11 @@ def plot_compare_image_differences(im1, im2, greyscale: bool = False, save_as: s
     diff = diff.sum(axis=-1, keepdims=True) if greyscale else diff
 
     fig, ax = plt.subplots(
-        1, h + 1, figsize=(4 * h + 0.2, 4), gridspec_kw={"width_ratios": [1] * h + [0.05], "wspace":-0.1})
+        1,
+        h + 1,
+        figsize=(4 * h + 0.2, 4),
+        gridspec_kw={"width_ratios": [1] * h + [0.05], "wspace": -0.1},
+    )
     cspec = "RGB"
     for i in range(h):
         h = ax[i].imshow(diff[:, :, i], cmap="seismic", vmin=-1, vmax=1)
@@ -70,7 +74,7 @@ def plot_compare_image_differences(im1, im2, greyscale: bool = False, save_as: s
     cbar.ax.tick_params(labelsize=24)
 
     if save_as is not None:
-        plt.savefig(f"figures/{save_as}.png", bbox_inches="tight", dpi=200)
+        plt.savefig(f"{save_as}.pdf", bbox_inches="tight", dpi=200)
     else:
         plt.tight_layout()
         plt.show()
@@ -188,7 +192,7 @@ def plot_compare_metric(
             exp,
             positions=positions[i],
             boxprops=dict(facecolor=colors[i], color=colors[i]),
-            **boxpl_args
+            **boxpl_args,
         )
         ax.plot([], color=colors[i], label=exp_labels[i], linewidth=8)
 
@@ -198,7 +202,7 @@ def plot_compare_metric(
     if log:
         ax.set_yscale("log")
 
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=3)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, 1.15), ncol=3)
     ax.grid()
     if save_as:
         plt.savefig(f"{save_as}.pdf", bbox_inches="tight")

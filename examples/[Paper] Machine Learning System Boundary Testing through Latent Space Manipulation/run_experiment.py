@@ -141,7 +141,7 @@ def main(
             samples_per_class=10,
             generations=generations,
             classes=clss,
-            save_to=f"results_lmt_{dataset}_{predictor}_{generator}_{objective}{nm}"
+            save_to=f"results_{dataset}_{predictor}_{generator}_{objective}{nm}"
             + ("_sm" if not interpolate else "")
             + ("_vd" if validity_domain else ""),
         )
