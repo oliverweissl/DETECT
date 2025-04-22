@@ -34,7 +34,7 @@ Boundary testing essentially tries to find inputs that confuse the classifier, i
 This again can be untargeted, where we do not care about the final class or targeted where we want to find a specific boundary.
 Note that here we dont care about the distance of images, since the boundary can either be of an adversarial subset in the classifiers desicion-manifold, or it can be a different class set entirely.
 """
-UNTARGETED_BOUNDARY_TESTING = [DynamicConfidenceBalance()]
+DYNAMIC_TARGETED_BOUNDARY_TESTING = [DynamicConfidenceBalance()]
 TARGETED_BOUNDARY_TESTING = [NaiveConfidenceBalance()]
 ADVERSARIAL_BOUNDARY_TESTING = [NaiveConfidenceBalance(), CFrobeniusDistance()]
 

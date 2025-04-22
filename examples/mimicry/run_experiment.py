@@ -21,7 +21,7 @@ from src.defaults.objective_configs import (
     TARGETED_ADVERSARIAL_TESTING,
     TARGETED_BOUNDARY_TESTING,
     UNTARGETED_ADVERSARIAL_TESTING,
-    UNTARGETED_BOUNDARY_TESTING,
+    DYNAMIC_TARGETED_BOUNDARY_TESTING,
     VALIDITY_BOUNDARY_TESTING,
 )
 from src.manipulator import StyleGANManipulator
@@ -29,7 +29,7 @@ from src.optimizer import PymooLearner
 
 """Some dicts to easily associate elements to arguments."""
 OBJECTIVES = {
-    "ubt": UNTARGETED_BOUNDARY_TESTING,
+    "ubt": DYNAMIC_TARGETED_BOUNDARY_TESTING,
     "tbt": TARGETED_BOUNDARY_TESTING,
     "abt": ADVERSARIAL_BOUNDARY_TESTING,
     "uat": UNTARGETED_ADVERSARIAL_TESTING,
