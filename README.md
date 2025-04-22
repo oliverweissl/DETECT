@@ -1,14 +1,10 @@
-# SMOO
-SMOO is a generalizable framework for testing of ML / DL models. 
-Understanding a classifiers behavior in various situations is important in many domains such as automated driving and many more.
-To test for boundaries we need a conditional StyleGAN pretrained on a dataset of similar domain. 
-It is important that it is conditional and as such can generate images based on class information.
+## Mimicry
+This is the replication Package for the paper *"Targeted Deep Learning Systems Boundary Testing"*. 
+The tools components are contained in `src/`, all models should be placed in the subfolders of `models/`. 
+For the pretrained models please look at the README files in the respective subfolders.
 
-The framework consists of four distinct components:
+In `examples/mimicry/` all scripts used for the experiments can be found. 
+The notebooks allow you to replicate the results extraction and analysis for each RQ easily.
 
-1) The `SUT`, which is the ml model to be tested.
-2) The `Manipulator`, which produces new test inputs based on some strategy $\kappa$
-3) The `Optimizer`, which produces strategies $\kappa$ based on the objectives $\omega$
-4) The `Objectives`, which quantify the "goodness" of a test input generated.
-
-These components are modular, as such we are not restricted to images, we are also able to quickly adapt the optimization strategy based on individual needs.
+For the human study we include the raw csv under `examples/mimicry/survey.csv`.
+We strongly advice to use conda for installing dependencies.
