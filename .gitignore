@@ -2,6 +2,7 @@
 .venv
 *.csv
 *.pkl
+*.pth
 **/_*.ipynb
 *.json*
 __pycache__
@@ -12,3 +13,7 @@ __pycache__
 **/artifacts/
 **/wandb/
 **/results/
+/local_models/segmentation/carparts_segment
+/local_models/classifiers/checkpoints/*
+/local_models/generators/
+/local_models/classifiers/checkpoints

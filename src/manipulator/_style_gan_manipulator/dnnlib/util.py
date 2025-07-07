@@ -435,7 +435,7 @@ def open_url(
     # but that converts forward slashes to backslashes and this causes
     # its own set of problems.
     if url.startswith("file://"):
-        filename = urllib.parse.urlparse(url).path
+        filename = urllib.parse.urlparse(url).dataset_path
         if re.match(r"^/[a-zA-Z]:", filename):
             filename = filename[1:]
         return filename if return_filename else open(filename, "rb")

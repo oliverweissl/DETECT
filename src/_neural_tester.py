@@ -20,7 +20,7 @@ from .persistence import DefaultDF
 
 
 class NeuralTester:
-    """A tester class for DNN using latent space manipulation in generative models."""
+    """A tester class for DNN using latent space manipulation in generative local_models."""
 
     """Used Components."""
     _sut: nn.Module

@@ -57,7 +57,7 @@ class Transpose(nn.Module):
 def forward_vit(pretrained, x):
     b, c, h, w = x.shape
 
-    _ = pretrained.model.forward_flex(x)
+    _ = pretrained.yolo_model.forward_flex(x)
 
     layer_1 = pretrained.activations["1"]
     layer_2 = pretrained.activations["2"]
@@ -74,8 +74,8 @@ def forward_vit(pretrained, x):
             2,
             torch.Size(
                 [
-                    h // pretrained.model.patch_size[1],
-                    w // pretrained.model.patch_size[0],
+                    h // pretrained.yolo_model.patch_size[1],
+                    w // pretrained.yolo_model.patch_size[0],
                 ]
             ),
         )
