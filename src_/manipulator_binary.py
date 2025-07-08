@@ -305,7 +305,7 @@ class ManipulatorSSpace:
                 preprocess= self.preprocess_fn,
                 w_latents= w,
                 target_class=self.target_logit,
-                epsilon=1e-6,
+                epsilon=0.1, #1e-6,
                 device = self.device
             )
         elif config == "smoothgrad":

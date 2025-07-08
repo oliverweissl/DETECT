@@ -1,8 +1,4 @@
 import os
-
-from pygments.styles.dracula import orange
-
-print(os.getcwd())
 import torch
 
 import gc

@@ -70,7 +70,7 @@ def occlusions_s_space(synthesis_net: torch.nn.Module,
 
         s_relevance[layer_name] = {
             'values': s_activation,
-            'relevance': layer_relevance
+            'grad': layer_relevance
         }
 
     return s_relevance, classifier_output, img
