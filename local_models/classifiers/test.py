@@ -46,4 +46,5 @@ with torch.no_grad():
 
 # SWAG
 # Test Loss: 0.2344, Test Acc: 0.8922
-# 15 glasses:
+# 15 glasses: Test Loss: 0.0445, Test Acc: 0.9819 2 epochs
+# 15 glasses: Test Loss: 0.0303, Test Acc: 0.9917 10 epochs

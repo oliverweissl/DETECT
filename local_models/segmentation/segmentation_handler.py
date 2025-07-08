@@ -62,14 +62,14 @@ class SegmentationModel:
         """
         return {
             "background": [0],
-            "skin": [1, 10, 14],
+            "skin": [1, 10, 14, 7, 8, 9],
             "eyebrows": [2, 3],
             "eyes": [4, 5],
             "glasses": [6],
-            "ears": [7, 8, 9], # "earrings": [9],
+            #"ears": [7, 8, 9], # "earrings": [9],
             "nose": [10],
             "mouth": [11, 12, 13], #"lips": [12, 13],
-            "neck": [14],
+            # "neck": [14],
             "necklaces": [15],
             "cloth": [16],
             "hair": [17],

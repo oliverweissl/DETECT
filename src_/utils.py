@@ -52,7 +52,7 @@ def remove_prefix_from_state_dict(state_dict, prefix='module.'):
     return new_state_dict
     """code to remove prefix """
     """from utils import remove_prefix_from_state_dict
-    input_path = sut_facial_path    # 原始带module的模型路径
+    input_path = sut_facial_path    # 
     output_path = sut_facial_path.replace('resnet_celeb_40','resnet_celeb_40_single')    
     
     # load parallel model
@@ -73,6 +73,16 @@ def load_facial_classifier(ckpt_path, device):
     from local_models.classifiers.celeb_resnet_model import AttributeClassifier
 
     model = AttributeClassifier()
+    model = model.to(device)
+    # model = torch.nn.DataParallel(model)  # covert to DataParallel
+    model.load_state_dict(torch.load(ckpt_path, weights_only=False))
+    model.eval()
+    return model
+
+def load_facial_large_classifier(ckpt_path, device):
+    from local_models.classifiers.celeb_swag_model import SWAGCelebAClassifier
+
+    model = SWAGCelebAClassifier()
     model = model.to(device)
     # model = torch.nn.DataParallel(model)  # covert to DataParallel
     model.load_state_dict(torch.load(ckpt_path, weights_only=False))
@@ -250,28 +260,17 @@ def predict_yolo(model, img_tensor, device, target_class):
 
 if __name__ == "__main__":
     print("--------------------------------------------------------")
-    """# Define a simple model
-    class SimpleModel(torch.nn.Module):
-        def __init__(self):
-            super(SimpleModel, self).__init__()
-            self.fc = torch.nn.Linear(5, 3)  # Model outputs 3 classes
+    os.chdir('..')
+    sut_facial_lagre_path = os.path.join('local_models/classifiers','checkpoints','swag_celeb_40_parallel.pth')
+    input_path = sut_facial_lagre_path    #
+    output_path = sut_facial_lagre_path.replace('_parallel','_single')
 
-        def forward(self, x):
-            # x shape: (batch_size, 5)
-            return self.fc(x)
+    # load parallel model
+    state_dict = torch.load(input_path, map_location='cpu')
 
+    # remove 'module.' prefix
+    clean_state_dict = remove_prefix_from_state_dict(state_dict)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = SimpleModel().to(device)
-    model.eval()
-
-    # Create a random input tensor and a corresponding zero baseline
-    input_tensor = torch.randn(1, 5)
-    baseline = torch.zeros_like(input_tensor)
-
-    # Specify a target class to explain, e.g., class 1
-    target_class = 1
-
-    # Compute the Integrated Gradients
-    ig = integrated_gradients(model, input_tensor, baseline, target_class, steps=100, device=device)
-    print("Integrated Gradients:\n", ig)"""
+    # save new file
+    torch.save(clean_state_dict, output_path)
+    print(f"model saved in {output_path}")

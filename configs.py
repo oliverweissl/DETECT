@@ -13,6 +13,10 @@ segmentation_facial_ckpt_path = "local_models/segmentation/face_segmentation.pth
 
 sut_facial_parallel_path = '/tmp/pycharm_project_181/local_models/classifiers/checkpoints/resnet_celeb_40_parallel.pth'
 sut_facial_path = '/tmp/pycharm_project_181/local_models/classifiers/checkpoints/resnet_celeb_40_single.pth'
+sut_facial_large_parallel_path = '/tmp/pycharm_project_181/local_models/classifiers/checkpoints/swag_celeb_40_parallel.pth'
+sut_facial_large_path = '/tmp/pycharm_project_181/local_models/classifiers/checkpoints/swag_celeb_40_single.pth'
+
+
 sut_dog_path = 'local_models/classifiers/checkpoints/dogs_triplet_rexnet_150_best_model.pth'
 
 celeba_attributes = [
@@ -182,6 +186,13 @@ preprocess_celeb_classifier = transforms.Compose([
                 transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
             ])
+preprocess_celeb_large_classifier = transforms.Compose([
+                ToTensorIfNeeded(),
+                transforms.Resize((518, 518)),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+            ])
+
 preprocess_rexnet_classifier = transforms.Compose([
                 ToTensorIfNeeded(),
                 transforms.Resize((224, 224)),
