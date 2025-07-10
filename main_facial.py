@@ -31,14 +31,11 @@ def main(model = 'small'):
         classifier = nn.DataParallel(classifier)"""
     segmenter = SegmentationModel(segmentation_facial_ckpt_path)
 
-
-
-
     target_logit = 15  # glasses
     top_channels = 10 # num of top channels considered in a layer
-    extent_factor = 10
-    config = "occlusion" # "gradient" or "smoothgrad" or "occlusion"
-    oracle = 'confidence_drop'  # or 'misclassification'
+    extent_factor = 10 # 10 for confidence_drop and 20 for misclassification
+    config = "smoothgrad" # "gradient" or "smoothgrad" or "occlusion"
+    oracle = 'confidence_drop'  # 'confidence_drop'  or 'misclassification'
 
     base_dir = os.path.join(generate_image_base_dir, 'runs', f'{model}_{config}_{oracle}')
     os.makedirs(base_dir, exist_ok=True)
@@ -55,7 +52,7 @@ def main(model = 'small'):
         device=device
     )
     # generate one random seed from z latent space
-    for torch_seed in range(0,21):
+    for torch_seed in range(0, 500):
         manipulator.handle_one_seed(
             torch_seed=torch_seed,
             top_channels=top_channels,

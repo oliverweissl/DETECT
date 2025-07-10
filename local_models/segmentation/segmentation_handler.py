@@ -70,7 +70,7 @@ class SegmentationModel:
             "nose": [10],
             "mouth": [11, 12, 13], #"lips": [12, 13],
             # "neck": [14],
-            "necklaces": [15],
+            #"necklaces": [15],
             "cloth": [16],
             "hair": [17],
             "hat": [18],
@@ -210,12 +210,15 @@ class SegmentationModel:
             v1 = hsv1[..., 2][union_mask > 0]
             v2 = hsv2[..., 2][union_mask > 0]
             v_diff = wasserstein_distance(v1, v2)
+            if h_diff > 15 or s_diff > 30 or v_diff > 30:
+                change = "color changed"
         else:
             h_diff = 0
             s_diff = 0
             v_diff = 0
             ssim_diff = 0
         #return iou_diff, [h_diff/180, s_diff/255, v_diff/255], ssim_diff, change #mse,
+
         return {
             "iou_diff": iou_diff,
             "hsv_diff": [h_diff/90, s_diff/255, v_diff/255],

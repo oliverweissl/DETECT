@@ -170,10 +170,9 @@ class ManipulatorSSpace:
         #assert max(img_np) <= 1 and min(img_np) >= 0, "image not in range [0, 1]"
         Image.fromarray((img_np * 255).astype(np.uint8)).save(img_dir)
 
-
     def handle_one_seed(self,
                         torch_seed,
-                        top_channels=1,
+                        top_channels=1, # not used with adaptive strategy
                         default_extent_factor=10,
                         tolerance_of_extent_bisection=1,
                         confidence_drop_threshold=0.3,
@@ -320,18 +319,21 @@ class ManipulatorSSpace:
                 device=self.device
             )
         # rank gradient to get the most important channel of each layer
+        top_channels = self.get_adaptive_top_channels("_")
         ranked_gradient_info = rank_gradient_info(s_gradients, top=top_channels)
 
         if specified_layer is None:
             for i, (layer_name, rank_data) in enumerate(ranked_gradient_info.items()):
                 if "rgb" in layer_name and skip_rgb_layer: # skip rgb layer
                     continue
-                for top_n in range(top_channels):
+                # get adaptive top channels
+                adaptive_top_channels = self.get_adaptive_top_channels(layer_name) # top_channels
+                for top_n in range(adaptive_top_channels):
                     confidence_drop, img_perturbed, prediction_perturbed_target = self.compare_perturbed(
                         s_gradients, layer_name, rank_data, prediction_target, extent_factor=default_extent_factor, top_n=top_n)
                     save_flag = False
                     # RQ1 we don't need threshold
-                    if oracle == "confidence_drop": #and confidence_drop > confidence_drop_threshold * np.abs(prediction_target):
+                    if oracle == "confidence_drop" and confidence_drop > confidence_drop_threshold * np.abs(prediction_target):
                         save_flag = True
                         print(f"Layer: {layer_name}, Ranking: {top_n} confidence_drop {confidence_drop:.2f} , "
                               f"confidence {prediction_target:.2f} {prediction_perturbed_target:.2f}")
@@ -342,8 +344,6 @@ class ManipulatorSSpace:
                             seg_result = None
 
                     elif oracle == "misclassification" and prediction_target * prediction_perturbed_target < 0:
-                        print("Not complete yet!!! ask XC to finish this")
-                        save_flag = True
                         (best_factor, best_adjusted_confidence, best_img_perturbed,
                          best_confidence_drop) = self.bisection_factor_adjustment(default_extent_factor,
                                                                                   prediction_target,
@@ -363,7 +363,30 @@ class ManipulatorSSpace:
                         print(f"misclassification!! adjusted factor {default_extent_factor}")
                         print(f"Layer: {layer_name}, Ranking: {top_n} confidence_drop {confidence_drop:.2f} , "
                               f"confidence {prediction_target:.2f} {prediction_perturbed_target:.2f}")
+                        # hill climbing to find the best factor
+                        # print("Using constrained optimization to ensure prediction flip")
+                        (best_factor, best_adjusted_confidence, best_img_perturbed,
+                         best_confidence_drop) = self.constrained_hill_climbing_factor_adjustment(
+                            default_extent_factor, prediction_target, prediction_perturbed_target,
+                            s_gradients, layer_name, rank_data, prediction_target, top_n)
 
+                        # check if prediction flip is guaranteed
+                        if (best_img_perturbed is not None and
+                            best_adjusted_confidence * prediction_target < 0):  #
+                            default_extent_factor = best_factor
+                            prediction_perturbed_target = best_adjusted_confidence
+                            img_perturbed = best_img_perturbed
+                            confidence_drop = best_confidence_drop
+                            print(f"✓ Prediction flip guaranteed! factor={default_extent_factor:.3f}")
+
+                            save_flag = True
+                            if self.segmenter is not None:
+                                mask_perturbed = self.segmenter.predict(img_perturbed)
+                                seg_result = self.segmenter.detect_changes(img, img_perturbed, mask, mask_perturbed)
+                            else:
+                                seg_result = None
+                        else:
+                            print("✗ Failed to maintain prediction flip, using fallback")
                     if save_flag:
                         seed_dir = os.path.join(self.save_dir, f"{torch_seed}")
                         if not os.path.exists(seed_dir):
@@ -403,3 +426,138 @@ class ManipulatorSSpace:
             # The case when we only want to perturb a specific layer
             print("Not complete yet!!! ask XC to finish this")
             pass
+
+    def constrained_hill_climbing_factor_adjustment(self, current_factor, initial_confidence, current_confidence,
+                                                    s_gradients, layer_name, rank_data, prediction_target, top_n,
+                                                    step_size=0.1, max_iterations=20, patience=3):
+        """
+        Use constrained hill climbing to adjust extent_factor ensuring prediction flip is maintained.
+
+        Args:
+            current_factor (float): Initial factor value
+            initial_confidence (float): Original confidence before perturbation
+            current_confidence (float): Current confidence after perturbation
+            s_gradients: Gradients in s-space
+            layer_name: Name of the layer to perturb
+            rank_data: Ranked gradient data
+            prediction_target: Target prediction value
+            top_n: Channel index
+            step_size (float): Initial step size for hill climbing
+            max_iterations (int): Maximum number of iterations
+            patience (int): Number of iterations to wait before reducing step size
+
+        Returns:
+            tuple: (best_factor, best_adjusted_confidence, best_img_perturbed, best_confidence_drop)
+        """
+
+        def is_misclassified(confidence, initial_conf):
+            """Check if prediction is flipped (signs are different)"""
+            return confidence * initial_conf < 0
+
+        def evaluate_factor(factor):
+            """Evaluate a factor and return results only if misclassification occurs"""
+            confidence_drop, img_perturbed, adjusted_confidence = self.compare_perturbed(
+                s_gradients, layer_name, rank_data, prediction_target,
+                extent_factor=factor, top_n=top_n
+            )
+
+            if is_misclassified(adjusted_confidence, initial_confidence):
+                return True, confidence_drop, img_perturbed, adjusted_confidence
+            else:
+                return False, None, None, None
+
+        # Verify initial condition
+        if not is_misclassified(current_confidence, initial_confidence):
+            print("Warning: Initial condition does not satisfy misclassification!")
+            return current_factor, current_confidence, None, None
+
+        best_factor = current_factor
+        best_adjusted_confidence = current_confidence
+        best_img_perturbed = None
+        best_confidence_drop = None
+
+        factor = current_factor
+        no_improvement_count = 0
+
+        for iteration in range(max_iterations):
+            # Try both directions with constraint checking
+            candidates = [
+                max(1e-5, factor - step_size),  # Decrease factor
+                factor + step_size  # Increase factor
+            ]
+
+            improved = False
+            for candidate_factor in candidates:
+                is_valid, confidence_drop, img_perturbed, adjusted_confidence = evaluate_factor(candidate_factor)
+
+                if is_valid and abs(adjusted_confidence) < abs(best_adjusted_confidence):
+                    best_factor = candidate_factor
+                    best_adjusted_confidence = adjusted_confidence
+                    best_img_perturbed = img_perturbed
+                    best_confidence_drop = confidence_drop
+                    factor = candidate_factor
+                    improved = True
+                    no_improvement_count = 0
+                    print(f"Constrained hill climbing iteration {iteration}: factor={factor:.3f}, "
+                          f"confidence={adjusted_confidence:.3f} (flip maintained)")
+                    break
+
+            if not improved:
+                no_improvement_count += 1
+                if no_improvement_count >= patience:
+                    step_size *= 0.5  # Reduce step size
+                    no_improvement_count = 0
+                    print(f"Reducing step size to {step_size:.3f}")
+
+                    if step_size < 1e-3:  # Stop if step size becomes too small
+                        break
+
+        # Final verification
+        if not is_misclassified(best_adjusted_confidence, initial_confidence):
+            print("Error: Final result does not maintain prediction flip!")
+            return None, None, None, None
+
+        return best_factor, best_adjusted_confidence, best_img_perturbed, best_confidence_drop
+
+    @staticmethod
+    def get_adaptive_top_channels(layer_name):
+        """
+        Get adaptive top_channels based on layer characteristics.
+
+        Args:
+            layer_name (str): Name of the layer
+
+        Returns:
+            int: Number of top channels to use for this layer
+        """
+        # define different layer strategies
+        layer_strategies = {
+            'early_layers': {
+                'patterns': ['b4.', 'b8.', 'b16.'],
+                'top_channels': 15
+            },
+
+            'middle_layers': {
+                'patterns': ['b32.', 'b64.', 'b128.', 'b256.'],
+                'top_channels': 15
+            },
+
+            'late_layers': {
+                'patterns': ['b512.', 'b1024.'],
+                'top_channels': 5
+            }
+        }
+
+        # check if the layer name contains any of the specified patterns
+        for strategy_name, strategy in layer_strategies.items():
+            for pattern in strategy['patterns']:
+                if pattern in layer_name:
+                    # print(f"Layer {layer_name} matched {strategy_name} (pattern: {pattern}): using {strategy['top_channels']} top channels")
+                    return strategy['top_channels']
+
+        # if no match found, use the default, return max channels
+        if layer_name != "_":
+            # print anomaly layer when layer name is not "_" the placeholder
+            print(f"Layer {layer_name} using max top channels")
+        return max(strategy['top_channels'] for strategy in layer_strategies.values())
+
