@@ -4,9 +4,10 @@ import numpy as np
 import json
 import matplotlib.pyplot as plt
 plt.style.use('dark_background')
+from PIL import Image
 
 from src_.utils import rank_gradient_info, perturbate_s_latents, convert_to_serializable
-from src_.backpropagation import generate_image_with_s_latents, backpropagation_gradients_s_space
+from src_.backpropagation import generate_image_with_s_latents, backpropagation_gradients_s_space, smoothgrad_s_space
 
 
 class ManipulatorSSpace:
@@ -36,7 +37,6 @@ class ManipulatorSSpace:
         self.save_dir = save_dir
 
     def _set_target_logit(self, target_logit):
-
         self.target_logit = target_logit
 
     def compare_perturbed(self, s_gradients, layer_name, rank_data, prediction_target, extent_factor, top_n=0):
@@ -62,7 +62,7 @@ class ManipulatorSSpace:
         gradient_single = rank_data['gradients'][top_n]
 
         # Apply perturbation
-        extent = np.sign(prediction_target) * (-extent_factor) * gradient_single
+        extent =  (-extent_factor) *  np.sign(gradient_single)# np.sign(prediction_target) *is always decreasing
         gradient_perturbed = perturbate_s_latents(s_gradients, layer_name, location, extent)
 
         # Generate the perturbed image
@@ -77,9 +77,10 @@ class ManipulatorSSpace:
         adjusted_confidence = prediction_perturbed[self.target_logit].cpu().detach().numpy()
 
         predicted_class = prediction_perturbed.argmax(0).squeeze(0).cpu().detach().numpy()
+        predicted_top_confidence = prediction_perturbed.max(0).values.squeeze(0).cpu().detach().numpy()
 
-        confidence_drop = np.sign(prediction_target) * (prediction_target - adjusted_confidence)
-        return confidence_drop, img_perturbed, adjusted_confidence, predicted_class
+        confidence_drop = (prediction_target - adjusted_confidence) # np.sign(prediction_target) *
+        return [confidence_drop,adjusted_confidence], img_perturbed,  [predicted_class, predicted_top_confidence]
 
     def bisection_factor_adjustment(self, current_factor, initial_confidence, current_confidence,tolerance, s_gradients, layer_name,
                                     rank_data, prediction_target, top_n, max_iterations=10):
@@ -171,30 +172,30 @@ class ManipulatorSSpace:
                         torch_seed,
                         class_dict,
                         top_channels=1,
-                        default_extent_factor=0.1,
-                        tolerance_of_extent_bisection=1,
+                        default_extent_factor=10,
                         confidence_drop_threshold=0.3,
+                        oracle="confidence_drop", # "misclassification"
                         specified_layer=None,
-                        skip_rgb_layer=True):
+                        skip_rgb_layer=True,
+                        truncation_psi = 0.7,
+                        config = "gradient"):
         """
         handle one seed
 
         Args:
             torch_seed: seed to generate
         """
+        assert oracle in ["confidence_drop", "misclassification"], "oracle must be either 'confidence_drop' or 'misclassification'"
+        assert config in ["gradient", "smoothgrad"], "config must be either 'gradient' or 'smoothgrad'"
+
         torch.manual_seed(torch_seed)
         # generate one random seed from z latent space
         z = torch.randn([1, self.generator.z_dim], device=self.device)
 
-        if self.generator.c_dim != 0:
-            label = torch.zeros([1, self.generator.c_dim], device=self.device)
-            target_class = 207  #  SELECT CLASS, not for facial task!
-            label[:, target_class] = 1
-        else:
-            label = None
+        label_sg = None
 
-        img_tensor = self.generator(z, label,
-                               truncation_psi=1, noise_mode='const')# ensure deterministic and reproducible
+        img_tensor = self.generator(z, label_sg,
+                               truncation_psi=truncation_psi, noise_mode='const')# ensure deterministic and reproducible
         img_tensor = (img_tensor.clamp(-1, 1) + 1) / 2  # normalize to [0, 1] ss
 
         img = img_tensor.cpu().detach().numpy()[0]
@@ -206,7 +207,7 @@ class ManipulatorSSpace:
         # multi-class classification
         target_class = prediction.argmax(0).squeeze(0).cpu().detach().numpy()
         self._set_target_logit(target_class)
-        prediction_target = prediction[self.target_logit].cpu().detach().numpy()
+        original_prediction_target = prediction[self.target_logit].cpu().detach().numpy()
 
         # get mask
         if self.segmenter is not None:
@@ -215,92 +216,304 @@ class ManipulatorSSpace:
             mask = np.zeros_like(img)
 
         # calculate w vector
-        w = self.generator.mapping(z, c=label)
+        w = self.generator.mapping(z, c=label_sg)
+        if truncation_psi != 1:
+            w = self.generator.mapping.w_avg + (w - self.generator.mapping.w_avg) * truncation_psi
 
-        s_gradients, classifier_output, img_tensor = backpropagation_gradients_s_space(
-            synthesis_net = self.generator.synthesis,
-            classifier = self.classifier,
-            preprocess= self.preprocess_fn,
-            w_latents= w,
-            target_class= self.target_logit, # glasses
-        )
-
+        if config == "gradient":
+            s_gradients, classifier_output, img_tensor = backpropagation_gradients_s_space(
+                synthesis_net = self.generator.synthesis,
+                classifier = self.classifier,
+                preprocess= self.preprocess_fn,
+                w_latents= w,
+                target_class= self.target_logit, # glasses
+            )
+        elif config == "smoothgrad":
+            s_gradients, classifier_output, img_tensor = smoothgrad_s_space(
+                synthesis_net = self.generator.synthesis,
+                classifier = self.classifier,
+                preprocess= self.preprocess_fn,
+                w_latents= w,
+                target_class= self.target_logit,
+                n_samples=10,
+                noise_scale=0.2,
+                device=self.device
+            )
         # rank gradient to get the most important channel of each layer
+        top_channels = self.get_adaptive_top_channels("_")
         ranked_gradient_info = rank_gradient_info(s_gradients, top=top_channels)
 
         if specified_layer is None:
             for i, (layer_name, rank_data) in enumerate(ranked_gradient_info.items()):
-                # layer_name, rank_data = list(ranked_gradient_info.items())[0]
                 if "rgb" in layer_name and skip_rgb_layer: # skip rgb layer
                     continue
-                for top_n in range(top_channels):
-                    confidence_drop, img_perturbed, prediction_perturbed_target, predicted_class = self.compare_perturbed(
-                        s_gradients, layer_name, rank_data, prediction_target, extent_factor=default_extent_factor, top_n=top_n)
 
-                    #if confidence_drop < confidence_drop_threshold* np.abs(prediction_target):
-                    #    continue
-                    if predicted_class != self.target_logit:
-                        # misclassification
+                adaptive_top_channels = self.get_adaptive_top_channels(layer_name)  # top_channels
+                for top_n in range(adaptive_top_channels):
+                    ([confidence_drop, prediction_perturbed_target], img_perturbed,
+                     [predicted_class, predicted_top_confidence]) = self.compare_perturbed(
+                        s_gradients, layer_name, rank_data, original_prediction_target, extent_factor=default_extent_factor, top_n=top_n)
+
+                    save_flag = False
+                    if oracle == "confidence_drop" and confidence_drop > confidence_drop_threshold * np.abs(original_prediction_target):
+                        save_flag = True
+
                         print(f"Layer: {layer_name}, Ranking: {top_n} confidence_drop {confidence_drop:.2f} , "
-                            f"confidence {prediction_target:.2f} {prediction_perturbed_target:.2f}")
-
-                        """if prediction_target * prediction_perturbed_target<0:
-    
-                            (best_factor, best_adjusted_confidence, best_img_perturbed, best_confidence_drop) = self.bisection_factor_adjustment(default_extent_factor,
-                                                                               prediction_target,
-                                                                               prediction_perturbed_target,
-                                                                               tolerance=tolerance_of_extent_bisection,
-                                                                               s_gradients=s_gradients,
-                                                                               layer_name=layer_name,
-                                                                               rank_data=rank_data,
-                                                                               prediction_target=prediction_target,
-                                                                               top_n=top_n
-                                                                               )
-                            if best_img_perturbed is not None:
-                                default_extent_factor = best_factor
-                                prediction_perturbed_target = best_adjusted_confidence
-                                img_perturbed = best_img_perturbed
-                                confidence_drop = best_confidence_drop
-                            print(f"misclassification!! adjusted factor {default_extent_factor}")
-                            print(f"Layer: {layer_name}, Ranking: {top_n} confidence_drop {confidence_drop:.2f} , "
-                                  f"confidence {prediction_target:.2f} {prediction_perturbed_target:.2f}")"""
-                        file_name = f"seed_{torch_seed}_{layer_name.replace('.', '_')}_{rank_data['ranked_indices'][top_n]}"
-
-                        os.makedirs(self.save_dir, exist_ok=True)
-                        img_perturbed_path = os.path.join(self.save_dir, file_name + ".png")
-                        json_path = os.path.join(self.save_dir, file_name + ".json")
-
+                              f"confidence {original_prediction_target:.2f} {prediction_perturbed_target:.2f}")
                         if self.segmenter is not None:
                             mask_perturbed = self.segmenter.predict(img_perturbed)
-                            result = self.segmenter.detect_changes(img, img_perturbed, mask, mask_perturbed)
+                            seg_result = self.segmenter.detect_changes(img, img_perturbed, mask, mask_perturbed)
                         else:
-                            #mask_perturbed = np.zeros_like(img_perturbed)
-                            result = None
+                            # mask_perturbed = np.zeros_like(img_perturbed)
+                            seg_result = None
+                    elif oracle == "misclassification" and predicted_class != self.target_logit:
+                        # misclassification
+                        print("perturbed_top_class: ", predicted_class)
+                        (best_factor, img_perturbed, [confidence_drop, prediction_perturbed_target],
+                         [predicted_class, predicted_top_confidence]) = self.constrained_hill_climbing_factor_adjustment(
+                            current_factor=default_extent_factor,
+                            s_gradients=s_gradients,
+                            layer_name=layer_name,
+                            rank_data=rank_data,
+                            prediction_target=original_prediction_target,
+                            original_predicted_class=self.target_logit,
+                            top_n=top_n,
+                            step_size=5,
+                            max_iterations=20,
+                            patience=3
+                        )
+                        # [confidence_drop, prediction_perturbed_target], img_perturbed,
+                        #                      [predicted_class, predicted_top_confidence]
 
+                        # check if prediction flip is guaranteed
+                        if (img_perturbed is not None and
+                                predicted_class !=  self.target_logit):  #
+                            save_flag = True
+                            default_extent_factor = best_factor
+
+                            print(f"✓ Prediction flip guaranteed! factor={default_extent_factor:.3f}")
+
+                            if self.segmenter is not None:
+                                mask_perturbed = self.segmenter.predict(img_perturbed)
+                                seg_result = self.segmenter.detect_changes(img, img_perturbed, mask, mask_perturbed)
+                            else:
+                                seg_result = None
+                    if save_flag:
+                        seed_dir = os.path.join(self.save_dir, f"{torch_seed}")
+                        if not os.path.exists(seed_dir):
+                            os.makedirs(seed_dir, exist_ok=True)
+                            self.save_image_np(img, os.path.join(seed_dir, "1_original.png"))
+
+                        file_name = f"{layer_name.replace('.', '_')}_{rank_data['ranked_indices'][top_n]}"
+
+                        img_perturbed_path = os.path.join(seed_dir, file_name + ".png")
+                        self.save_image_np(img_perturbed, img_perturbed_path)
+
+                        json_path = os.path.join(seed_dir, file_name + ".json")
 
                         info = {
                             'seed': torch_seed,
+                            "oracle": oracle,
+                            "config": config,
                             "confidence_drop": confidence_drop,
                             "original_class": f"{self.target_logit} : {class_dict[int(self.target_logit)]}",
-                            "original_confidence": prediction_target,
+                            "original_confidence": original_prediction_target,
                             "perturbed_class": f"{predicted_class} : {class_dict[int(predicted_class)]}",
                             "perturbed_confidence": prediction_perturbed_target,
+                            "perturbed_top_confidence": predicted_top_confidence,
                             "extent_factor": default_extent_factor,
                             "top_n": top_n,
                             "layer_name": layer_name,
                             "channel_id": rank_data['ranked_indices'][top_n],
                             "gradient": rank_data['gradients'][top_n],
                             "img_path": img_perturbed_path,
-                            "significant_changes": result[:8] if result is not None else None
+                            "significant_changes": seg_result[:8] if seg_result is not None else None
                         }
 
                         with open(json_path, 'w') as f:
                             json.dump(convert_to_serializable(info), f, indent=4)
                         self.plot_comparison(img, img_perturbed,
                                                confidence_drop,
-                                               img_perturbed_path,
-                                             prediction_target, prediction_perturbed_target)
+                                               img_perturbed_path.replace(".png", "_comparison.png"),
+                                             original_prediction_target, prediction_perturbed_target)
         else:
             # The case when we only want to perturb a specific layer
-
+            print("Not complete yet!!! ask XC to finish this")
             pass
+
+    def constrained_hill_climbing_factor_adjustment(self, current_factor,
+                                                    s_gradients, layer_name, rank_data, prediction_target, top_n,
+                                                    original_predicted_class, step_size=0.2, max_iterations=20,
+                                                    patience=3, verbose=False):
+        """
+        Use constrained hill climbing to adjust extent_factor ensuring prediction flip is maintained.
+
+        Args:
+            current_factor (float): Initial factor value
+            #current_confidence (float): Current confidence after perturbation
+            s_gradients: Gradients in s-space
+            layer_name: Name of the layer to perturb
+            rank_data: Ranked gradient data
+            prediction_target: Target prediction value
+            top_n: Channel index
+            original_predicted_class: Original predicted class before perturbation
+            step_size (float): Initial step size for hill climbing
+            max_iterations (int): Maximum number of iterations
+            patience (int): Number of iterations to wait before reducing step size
+
+        Returns:
+            tuple: (best_factor, best_adjusted_confidence, best_img_perturbed, best_confidence_drop)
+        """
+
+        def is_misclassified(predicted_class, original_class):
+            """Check if prediction class has changed from original"""
+            return predicted_class != original_class
+        def evaluate_factor(factor):
+            """Evaluate a factor and return results only if misclassification occurs"""
+            # ([confidence_drop, prediction_perturbed_target], img_perturbed,
+            #                      [predicted_class, predicted_top_confidence])
+            confidence_info, img_perturbed, prediction_info = self.compare_perturbed(
+                s_gradients, layer_name, rank_data, prediction_target,
+                extent_factor=factor, top_n=top_n
+            )
+
+            confidence_drop, adjusted_confidence = confidence_info
+            predicted_class, top_confidence = prediction_info
+
+            if is_misclassified(predicted_class, original_predicted_class):
+                decision_margin = abs(top_confidence - adjusted_confidence)
+                return True, confidence_drop, img_perturbed, decision_margin, predicted_class, confidence_info, prediction_info
+            else:
+                return False, None, None, float('inf'), None, None, None
+
+        # Get initial predicted class for verification
+        confidence_info, _, prediction_info = self.compare_perturbed(
+            s_gradients, layer_name, rank_data, prediction_target,
+            extent_factor=current_factor, top_n=top_n
+        )
+        initial_predicted_class = prediction_info[0]  # predicted_class is at index 0
+
+        # Verify initial condition
+        if not is_misclassified(initial_predicted_class, original_predicted_class):
+            print(f"Warning: Initial condition does not satisfy misclassification! {initial_predicted_class} == {original_predicted_class}")
+            return current_factor, None,  confidence_info, prediction_info
+
+        best_factor = current_factor
+        best_decision_margin = float('inf')
+        best_img_perturbed = None
+        best_confidence_info = confidence_info
+        best_prediction_info = prediction_info
+
+        _, _, _, initial_margin, _, _, _ = evaluate_factor(current_factor)
+        best_decision_margin = initial_margin
+
+        factor = current_factor
+        no_improvement_count = 0
+
+        #print(f"Initial decision margin: {initial_margin:.3f}")
+
+        for iteration in range(max_iterations):
+            # Try both directions with constraint checking
+            candidates = [
+                max(1e-5, factor - step_size),  # Decrease factor
+                factor + step_size  # Increase factor
+            ]
+
+            improved = False
+            for candidate_factor in candidates:
+                is_valid, confidence_drop, img_perturbed, decision_margin, predicted_class, conf_info, pred_info = evaluate_factor(
+                    candidate_factor)
+
+                # to find better decision margin
+                if is_valid and decision_margin < best_decision_margin:
+                    best_factor = candidate_factor
+                    best_decision_margin = decision_margin
+                    best_img_perturbed = img_perturbed
+                    best_confidence_info = conf_info
+                    best_prediction_info = pred_info
+                    factor = candidate_factor
+                    improved = True
+                    no_improvement_count = 0
+
+                    # print debugging info
+                    if verbose:
+                        _, adjusted_conf = conf_info
+                        _, top_conf= pred_info
+                        print(f"Hill climbing iteration {iteration}: factor={factor:.3f}, "
+                              f"decision_margin={decision_margin:.3f}, "
+                              f"top_confidence={top_conf:.3f}, adjusted_confidence={adjusted_conf:.3f}, "
+                              f"predicted_class={predicted_class} (misclassification maintained)")
+                    break
+
+            if not improved:
+                no_improvement_count += 1
+                if no_improvement_count >= patience:
+                    step_size *= 0.5  # Reduce step size
+                    no_improvement_count = 0
+                    # print(f"Reducing step size to {step_size:.3f}")
+
+                    if step_size < 1e-3:  # Stop if step size becomes too small
+                        break
+
+        # Final verification
+        confidence_info, final_img_perturbed, prediction_info = self.compare_perturbed(
+            s_gradients, layer_name, rank_data, prediction_target,
+            extent_factor=best_factor, top_n=top_n
+        )
+        final_predicted_class = prediction_info[0]
+
+        if not is_misclassified(final_predicted_class, original_predicted_class):
+            print("Error: Final result does not maintain prediction flip!")
+            return current_factor, None, confidence_info, prediction_info
+
+        print(f"Final result: factor={best_factor:.3f}, decision_margin={best_decision_margin:.3f}")
+        return best_factor, best_img_perturbed, best_confidence_info, best_prediction_info
+
+
+    @staticmethod
+    def save_image_np(img_np, img_dir):
+        # assert max(img_np) <= 1 and min(img_np) >= 0, "image not in range [0, 1]"
+        Image.fromarray((img_np * 255).astype(np.uint8)).save(img_dir)
+
+
+    @staticmethod
+    def get_adaptive_top_channels(layer_name):
+        """
+        Get adaptive top_channels based on layer characteristics.
+
+        Args:
+            layer_name (str): Name of the layer
+
+        Returns:
+            int: Number of top channels to use for this layer
+        """
+        # define different layer strategies
+        layer_strategies = {
+            'early_layers': {
+                'patterns': ['b4.', 'b8.', 'b16.'],
+                'top_channels': 15
+            },
+
+            'middle_layers': {
+                'patterns': ['b32.', 'b64.', 'b128.', 'b256.'],
+                'top_channels': 15
+            },
+
+            'late_layers': {
+                'patterns': ['b512.', 'b1024.'],
+                'top_channels': 5
+            }
+        }
+
+        # check if the layer name contains any of the specified patterns
+        for strategy_name, strategy in layer_strategies.items():
+            for pattern in strategy['patterns']:
+                if pattern in layer_name:
+                    # print(f"Layer {layer_name} matched {strategy_name} (pattern: {pattern}): using {strategy['top_channels']} top channels")
+                    return strategy['top_channels']
+
+        # if no match found, use the default, return max channels
+        if layer_name != "_":
+            # print anomaly layer when layer name is not "_" the placeholder
+            print(f"Layer {layer_name} using max top channels")
+        return max(strategy['top_channels'] for strategy in layer_strategies.values())

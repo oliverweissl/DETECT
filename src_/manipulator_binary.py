@@ -6,7 +6,7 @@ import json
 import matplotlib.pyplot as plt
 plt.style.use('dark_background')
 
-from utils import rank_gradient_info, perturbate_s_latents, convert_to_serializable
+from src_.utils import rank_gradient_info, perturbate_s_latents, convert_to_serializable
 from src_.backpropagation import (generate_image_with_s_latents,
                                   backpropagation_gradients_s_space, smoothgrad_s_space)
 from src_.occlusion import occlusions_s_space

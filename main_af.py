@@ -19,17 +19,16 @@ def main():
     # load local_models
     generator = load_generator(gan_lsun_dog_ckpt_path, device)
     classifier = load_rexnet_dog_classifier(sut_dog_path, device)
-    """if torch.cuda.device_count() > 1:
-        print(f"Using {torch.cuda.device_count()} GPUs")
-        generator = nn.DataParallel(generator)
-        classifier = nn.DataParallel(classifier)"""
+
+    truncation_psi = 0.7
     segmenter = None
+    extent_factor = 20  # 10 for confidence_drop and 20 for misclassification
+    top_channels = 10
+    config = "smoothgrad" # "gradient" or "smoothgrad"
+    oracle = 'misclassification'  # 'confidence_drop'  or 'misclassification'
 
-    base_dir = os.path.join(generate_image_base_dir, 'generated_dog_images_rexnet')
+    base_dir = os.path.join(generate_image_base_dir, 'runs', f'dogs_{config}_{oracle}')
     os.makedirs(base_dir, exist_ok=True)
-
-    top_channels = 2
-
     manipulator = ManipulatorSSpace(
         generator=generator,
         classifier=classifier,
@@ -39,7 +38,7 @@ def main():
         device=device
     )
     # generate one random seed from z latent space
-    for torch_seed in range(50):
+    for torch_seed in range(10,50):
 
         data_path = os.path.join(base_dir, f"{torch_seed}")
         manipulator.save_dir = data_path
@@ -49,10 +48,13 @@ def main():
             torch_seed=torch_seed,
             class_dict=dog_rexnet_dict,
             top_channels=top_channels,
-            default_extent_factor=0.05,
-            tolerance_of_extent_bisection=1,
+            default_extent_factor=extent_factor,
             confidence_drop_threshold=0.3,
+            oracle= oracle, # "misclassification"
             specified_layer=None,
+            skip_rgb_layer=True,
+            truncation_psi = truncation_psi,
+            config = config
         )
         gc.collect()
 

@@ -12,7 +12,6 @@ from configs import (gan_car_ckpt_path, generate_image_base_dir)
 
 
 def main():
-    truncation_psi = 0.5
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("device ", device)
 
@@ -21,14 +20,14 @@ def main():
     yolo = YOLO("yolov8n.pt")
     yolo_model = yolo.model.to(device)
 
-
+    truncation_psi = 0.5
     segmenter = None
     extent_factor = 20  # 10 for confidence_drop and 20 for misclassification
     top_channels = 10
     config = "smoothgrad" # "gradient" or "smoothgrad"
     oracle = 'misclassification'  # 'confidence_drop'  or 'misclassification'
 
-    base_dir = os.path.join(generate_image_base_dir, 'runs', f'tmp_yolocar_{config}_{oracle}')
+    base_dir = os.path.join(generate_image_base_dir, 'runs', f'yolocar_{config}_{oracle}')
     os.makedirs(base_dir, exist_ok=True)
 
     manipulator = ManipulatorSSpace(

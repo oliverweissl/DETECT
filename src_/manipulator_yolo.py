@@ -4,8 +4,6 @@ import numpy as np
 import json
 import matplotlib.pyplot as plt
 from PIL import Image
-from gitdb.fun import delta_chunk_apply
-from sympy.abc import delta
 
 plt.style.use('dark_background')
 
@@ -77,7 +75,7 @@ class ManipulatorSSpace:
 
         # Get the classifier confidence for the perturbed image
         predicted_idx, predicted_class, boxes_xywh, top_confidence, target_confidence, _ = predict_yolo(self.classifier, img_perturbed_tensor, self.device, target_class=self.target_logit)
-        confidence_drop = np.sign(prediction_target) * (prediction_target - target_confidence)
+        confidence_drop =  (prediction_target - target_confidence) # np.sign(prediction_target) *
         return [confidence_drop, target_confidence], img_perturbed,  [predicted_idx, predicted_class,top_confidence,boxes_xywh]
 
     def bisection_factor_adjustment(self, current_factor, initial_confidence, current_confidence,tolerance, s_gradients, layer_name,
@@ -282,7 +280,7 @@ class ManipulatorSSpace:
                             prediction_target = original_top_confidence,
                             original_predicted_class=original_top_class,
                             top_n = top_n,
-                            step_size=0.1,
+                            step_size=5,
                             max_iterations=20,
                             patience=3
                         )
