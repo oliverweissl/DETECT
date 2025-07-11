@@ -12,8 +12,7 @@ from configs import (gan_car_ckpt_path, generate_image_base_dir)
 
 
 def main():
-    extent_factor = 80
-    truncation_psi = 0.6
+    truncation_psi = 0.5
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("device ", device)
 
@@ -22,31 +21,25 @@ def main():
     yolo = YOLO("yolov8n.pt")
     yolo_model = yolo.model.to(device)
 
-    """if torch.cuda.device_count() > 1:
-        print(f"Using {torch.cuda.device_count()} GPUs")
-        generator = nn.DataParallel(generator)
-        classifier = nn.DataParallel(classifier)"""
+
     segmenter = None
+    extent_factor = 20  # 10 for confidence_drop and 20 for misclassification
+    top_channels = 10
+    config = "smoothgrad" # "gradient" or "smoothgrad"
+    oracle = 'misclassification'  # 'confidence_drop'  or 'misclassification'
 
-    base_dir = os.path.join(generate_image_base_dir, f'generated_car_images_yolo_{extent_factor}_{truncation_psi}')
+    base_dir = os.path.join(generate_image_base_dir, 'runs', f'tmp_yolocar_{config}_{oracle}')
     os.makedirs(base_dir, exist_ok=True)
-
-    top_channels = 2
 
     manipulator = ManipulatorSSpace(
         generator=generator,
         classifier=yolo_model,
         segmenter=segmenter,
-        #target_class=2,
-        # preprocess_fn=preprocess_celeb_classifier,
-        save_dir="",
+        save_dir=base_dir,
         device=device
     )
     # generate one random seed from z latent space
     for torch_seed in range(0,100):
-
-        data_path = os.path.join(base_dir, f"{torch_seed}")
-        manipulator.save_dir = data_path
         # os.makedirs(data_path, exist_ok=True)
 
         manipulator.handle_one_seed(
@@ -54,10 +47,12 @@ def main():
             class_dict=yolo.names,
             top_channels=top_channels,
             default_extent_factor=extent_factor,
-            tolerance_of_extent_bisection=1,
-            confidence_drop_threshold=0.3,
+            confidence_drop_threshold=0.4,
+            oracle=oracle,
             specified_layer=None,
-            truncation_psi= truncation_psi
+            truncation_psi= truncation_psi,
+            config = config
+
         )
         gc.collect()
 

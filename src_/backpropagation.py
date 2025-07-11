@@ -324,6 +324,57 @@ def backpropagation_gradients_s_space_yolo(synthesis_net: torch.nn.Module,
     return s_gradients, classifier_output, img
 
 
+def smoothgrad_s_space_yolo(synthesis_net: torch.nn.Module,
+                           classifier: torch.nn.Module,
+                           w_latents: torch.Tensor,
+                           target_idx: int,
+                           target_class: int,
+                           n_samples=10,
+                           noise_scale=0.15,
+                           device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+    """
+    Compute SmoothGrad for S-space representations for YOLO.
+
+    Parameters:
+      synthesis_net: The StyleGAN synthesis network.
+      classifier: The classifier network (YOLO).
+      w_latents: The input tensor requiring explanation; shape: (N, ...).
+      target_idx: int - target detection index.
+      target_class: int - target class index.
+      n_samples: Number of noisy samples to generate.
+      noise_scale: Standard deviation of the noise to add.
+      device: The device to run the computation on.
+
+    Returns:
+      smoothed_s_gradients: A dictionary with smoothed gradients for each S-space layer.
+      classifier_output: Output logits from classifier (from clean input).
+      synthesized_image: The generated image (from clean input).
+    """
+    # Get the clean prediction first
+    smoothed_s_gradients, classifier_output, synthesized_image = backpropagation_gradients_s_space_yolo(
+        synthesis_net, classifier, w_latents, target_idx, target_class, device)
+
+    # Generate n_samples noisy versions and compute gradients
+    for i in range(n_samples-1):
+        # Add Gaussian noise to the input
+        noise = torch.randn_like(w_latents) * noise_scale
+        noisy_w_latents = w_latents + noise
+
+        # Compute gradients for the noisy input
+        s_gradients, _, _ = backpropagation_gradients_s_space_yolo(
+            synthesis_net, classifier, noisy_w_latents, target_idx, target_class, device)
+
+        # Accumulate gradients
+        for layer_name, data in s_gradients.items():
+            smoothed_s_gradients[layer_name]['grad'] += data['grad']
+
+    # Average the gradients
+    for layer_name in smoothed_s_gradients.keys():
+        smoothed_s_gradients[layer_name]['grad'] /= n_samples
+
+    return smoothed_s_gradients, classifier_output, synthesized_image
+
+
 def generate_image_with_s_latents(synthesis_net: torch.nn.Module, s_latents: dict, device=torch.device('cuda')):
     """
     Generate an image using pre-defined S-space latents.

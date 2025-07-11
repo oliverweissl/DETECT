@@ -79,59 +79,6 @@ class ManipulatorSSpace:
         confidence_drop = np.sign(prediction_target) * (prediction_target - adjusted_confidence)
         return confidence_drop, img_perturbed, adjusted_confidence
 
-    def bisection_factor_adjustment(self, current_factor, initial_confidence, current_confidence,tolerance, s_gradients, layer_name,
-                                    rank_data, prediction_target, top_n, max_iterations=10):
-        """
-        Dynamically adjust the extent_factor using the bisection method to achieve misclassification
-        with the adjusted confidence closest to 0.
-
-        Args:
-            current_factor (float): Initial upper bound for factor adjustment.
-            initial_confidence (float): Confidence value of the original (unperturbed) image.
-            current_confidence (float): Current confidence after perturbation.
-            tolerance (float): Precision tolerance for bisection convergence.
-            s_gradients: Gradients in s-space.
-            layer_name: Name of the layer to perturb.
-            rank_data: Ranked gradient data for a specific layer.
-            prediction_target: Target prediction value for comparison.
-            top_n: Index of the channel to perturb based on importance ranking.
-
-        Returns:
-            tuple: (best_factor, best_adjusted_confidence)
-                - best_factor: The optimal extent_factor for misclassification close to 0 confidence.
-                - best_adjusted_confidence: The adjusted confidence for the optimal factor.
-        """
-        low = 1e-5  # Smallest extent_factor
-        high = current_factor  # Upper bound
-        mid = (low + high) / 2.0  # Initial midpoint
-
-        best_factor = current_factor
-        best_adjusted_confidence = current_confidence # Start with infinity for comparison
-        best_img_perturbed = None
-        best_confidence_drop = None
-
-        ierations = 0
-        # Iteratively perform bisection search
-        while high - low > tolerance and ierations < max_iterations:
-            confidence_drop, img_perturbed, adjusted_confidence = self.compare_perturbed(
-                s_gradients, layer_name, rank_data, prediction_target, extent_factor=mid, top_n=top_n
-            )
-            print(f"low: {low:.2f}, high: {high:.2f}, mid: {mid:.2f}, adjusted_confidence: {adjusted_confidence:.2f}, initial_confidence: {initial_confidence:.2f}, best_adjusted_confidence: {best_adjusted_confidence:.2f}")
-
-            if  adjusted_confidence * initial_confidence < 0:
-                high = mid
-                if abs(adjusted_confidence) < abs(best_adjusted_confidence):
-                    best_factor = mid
-                    best_adjusted_confidence = adjusted_confidence
-                    best_img_perturbed = img_perturbed
-                    best_confidence_drop = confidence_drop
-            else:
-                low = mid  # Narrow search to larger factors
-
-            mid = (low + high) / 2.0  # Update midpoint for next iteration
-            ierations += 1
-        return best_factor, best_adjusted_confidence, best_img_perturbed, best_confidence_drop
-
     def plot_comparison(self, original_img, img_perturbed, prediction_delta, save_path,
                         predicate_target, predicate_perturbed_target):
         """
@@ -174,7 +121,6 @@ class ManipulatorSSpace:
                         torch_seed,
                         top_channels=1, # not used with adaptive strategy
                         default_extent_factor=10,
-                        tolerance_of_extent_bisection=1,
                         confidence_drop_threshold=0.3,
                         oracle="confidence_drop", # "misclassification"
                         specified_layer=None,
@@ -260,14 +206,9 @@ class ManipulatorSSpace:
         # generate one random seed from z latent space
         z = torch.randn([1, self.generator.z_dim], device=self.device)
 
-        if self.generator.c_dim != 0:
-            label = torch.zeros([1, self.generator.c_dim], device=self.device)
-            target_class = 207  #  SELECT CLASS, not for facial task!
-            label[:, target_class] = 1
-        else:
-            label = None
+        label_sg = None
 
-        img_tensor = self.generator(z, label,
+        img_tensor = self.generator(z, label_sg,
                                truncation_psi=truncation_psi, noise_mode='const')# ensure deterministic and reproducible
         img_tensor = (img_tensor.clamp(-1, 1) + 1) / 2  # normalize to [0, 1] ss
 
@@ -285,7 +226,7 @@ class ManipulatorSSpace:
             mask = np.zeros_like(img) # dummy mask
 
         # calculate w vector
-        w = self.generator.mapping(z, c=label)
+        w = self.generator.mapping(z, c=label_sg)
         if truncation_psi != 1:
             w = self.generator.mapping.w_avg + (w - self.generator.mapping.w_avg) * truncation_psi
         if config == "gradient":
@@ -344,27 +285,6 @@ class ManipulatorSSpace:
                             seg_result = None
 
                     elif oracle == "misclassification" and prediction_target * prediction_perturbed_target < 0:
-                        (best_factor, best_adjusted_confidence, best_img_perturbed,
-                         best_confidence_drop) = self.bisection_factor_adjustment(default_extent_factor,
-                                                                                  prediction_target,
-                                                                                  prediction_perturbed_target,
-                                                                                  tolerance=tolerance_of_extent_bisection,
-                                                                                  s_gradients=s_gradients,
-                                                                                  layer_name=layer_name,
-                                                                                  rank_data=rank_data,
-                                                                                  prediction_target=prediction_target,
-                                                                                  top_n=top_n
-                                                                                  )
-                        if best_img_perturbed is not None:
-                            default_extent_factor = best_factor
-                            prediction_perturbed_target = best_adjusted_confidence
-                            img_perturbed = best_img_perturbed
-                            confidence_drop = best_confidence_drop
-                        print(f"misclassification!! adjusted factor {default_extent_factor}")
-                        print(f"Layer: {layer_name}, Ranking: {top_n} confidence_drop {confidence_drop:.2f} , "
-                              f"confidence {prediction_target:.2f} {prediction_perturbed_target:.2f}")
-                        # hill climbing to find the best factor
-                        # print("Using constrained optimization to ensure prediction flip")
                         (best_factor, best_adjusted_confidence, best_img_perturbed,
                          best_confidence_drop) = self.constrained_hill_climbing_factor_adjustment(
                             default_extent_factor, prediction_target, prediction_perturbed_target,

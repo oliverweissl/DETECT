@@ -244,6 +244,9 @@ def perturbate_s_latents(s_latent, layer_name, index, extent=0.1):
 
 
 def predict_yolo(model, img_tensor, device, target_class):
+    def inverse_sigmoid(y, eps=1e-6):
+        y = torch.clamp(y, eps, 1 - eps)  # avoid log(0)
+        return torch.log(y / (1 - y))
     model.to(device).eval()
 
     prediction = model(img_tensor)[0].squeeze(0).T
@@ -254,9 +257,13 @@ def predict_yolo(model, img_tensor, device, target_class):
     top_class = int(class_probs[top_idx].argmax())
     boxes_xywh = prediction[top_idx, :4].cpu().detach().numpy()
 
-    top_confidence = prediction[top_idx, 4+top_class].cpu().detach().numpy()
+    top_confidence = prediction[top_idx, 4+top_class]
     target_confidence = prediction[:, 4+target_class].max().cpu().detach().numpy()
-    return top_idx, top_class, boxes_xywh, top_confidence, target_confidence
+
+    top_confidence_raw = inverse_sigmoid(torch.tensor(top_confidence)).cpu().detach().numpy()
+    target_confidence_raw = inverse_sigmoid(torch.tensor(target_confidence)).cpu().detach().numpy()
+
+    return top_idx, top_class, boxes_xywh, top_confidence_raw, target_confidence_raw, top_confidence
 
 if __name__ == "__main__":
     print("--------------------------------------------------------")

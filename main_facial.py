@@ -25,17 +25,13 @@ def main(model = 'small'):
         classifier = load_facial_large_classifier(sut_facial_large_path, device)
     generator = load_generator(gan_facial_ckpt_path, device)
 
-    """if torch.cuda.device_count() > 1:
-        print(f"Using {torch.cuda.device_count()} GPUs")
-        generator = nn.DataParallel(generator)
-        classifier = nn.DataParallel(classifier)"""
     segmenter = SegmentationModel(segmentation_facial_ckpt_path)
 
     target_logit = 15  # glasses
     top_channels = 10 # num of top channels considered in a layer
-    extent_factor = 10 # 10 for confidence_drop and 20 for misclassification
+    extent_factor = 20 # 10 for confidence_drop and 20 for misclassification
     config = "smoothgrad" # "gradient" or "smoothgrad" or "occlusion"
-    oracle = 'confidence_drop'  # 'confidence_drop'  or 'misclassification'
+    oracle = 'misclassification'  # 'confidence_drop'  or 'misclassification'
 
     base_dir = os.path.join(generate_image_base_dir, 'runs', f'{model}_{config}_{oracle}')
     os.makedirs(base_dir, exist_ok=True)
@@ -57,7 +53,6 @@ def main(model = 'small'):
             torch_seed=torch_seed,
             top_channels=top_channels,
             default_extent_factor=extent_factor,
-            tolerance_of_extent_bisection=1,
             confidence_drop_threshold=0.5,
             oracle=oracle,
             specified_layer=None,
