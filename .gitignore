@@ -7,13 +7,12 @@
 *.json*
 __pycache__
 
+**/_*/
+**/*models/
+**/notebooks/
+**/runs/
 **/figures/
 **/*data*/
-**/_artifacts/
 **/artifacts/
 **/wandb/
 **/results/
-/local_models/segmentation/carparts_segment
-/local_models/classifiers/checkpoints/*
-/local_models/generators/
-/local_models/classifiers/checkpoints

@@ -1,5 +1,3 @@
-from timm.models import rexnet_100
-
 gan_facial_ckpt_path = "local_models/generators/stylegan2-ffhq-1024x1024.pkl"
 gan_imagenet_ckpt_path = "local_models/generators/imagenet128.pkl"
 gan_afhq_ckpt_path = "local_models/generators/stylegan3-r-afhqv2-512x512.pkl"
@@ -7,7 +5,7 @@ gan_lsun_dog_ckpt_path = "local_models/generators/stylegan2-lsundog-256x256.pkl"
 gan_cat_ckpt_path = "local_models/generators/stylegan2-afhqcat-512x512.pkl"
 gan_car_ckpt_path = "local_models/generators/stylegan2-car-config-f.pkl"
 
-generate_image_base_dir = "/home/xchen/SMOO/"
+generate_image_base_dir = "."
 
 segmentation_facial_ckpt_path = "local_models/segmentation/face_segmentation.pth"
 
@@ -158,6 +156,7 @@ cat_rexnet_dict = {0: 'cat - egyptian mau', 1: 'cat - bengal',
                    8: 'cat - abyssinian', 9: 'cat - sphynx',
                    10: 'cat - ragdoll', 11: 'cat - siamese',
                    12: 'cat - american shorthair', 13: 'cat - persian'}
+
 import torch
 from torchvision import transforms
 import numpy as np
