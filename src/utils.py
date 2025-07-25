@@ -1,7 +1,6 @@
 import torch
 import os
 import json
-from torch import nn
 from collections import OrderedDict
 import numpy as np
 
@@ -29,6 +28,9 @@ def convert_to_serializable(obj):
         return float(obj)  # Convert numpy float to native Python float
     elif isinstance(obj, (np.int32, np.int64)):  # Handle numpy integer types
         return int(obj)  # Convert numpy int to native Python int
+    elif isinstance(obj, torch.Tensor):
+        return obj.cpu().tolist()
+
     return obj  # Return the object unchanged if it doesn't match any special types
 
 def remove_prefix_from_state_dict(state_dict, prefix='module.'):
@@ -65,7 +67,7 @@ def remove_prefix_from_state_dict(state_dict, prefix='module.'):
     torch.save(clean_state_dict, output_path)"""
 
 def load_generator(gan_ckpt_path, device):
-    from src.manipulator._style_gan_manipulator.legacy import load_network_pkl
+    from src._style_gan_legacy.legacy import load_network_pkl
     with open(gan_ckpt_path, 'rb') as f:
         return load_network_pkl(f)['G_ema'].to(device)
 
@@ -136,8 +138,36 @@ def load_data(data_path, target_class_id, sample_id):
 
     return gradient, metadata
 
+def get_adaptive_top_channels(layer_name):
+    """
+    Get adaptive top_channels based on layer characteristics.
+    Common implementation across all manipulator types.
+    """
+    layer_strategies = {
+        'early_layers': {
+            'patterns': ['b4.', 'b8.', 'b16.'],
+            'top_channels': 15
+        },
+        'middle_layers': {
+            'patterns': ['b32.', 'b64.', 'b128.', 'b256.'],
+            'top_channels': 15
+        },
+        'late_layers': {
+            'patterns': ['b512.', 'b1024.'],
+            'top_channels': 5
+        }
+    }
 
-def rank_gradient_info(s_latents, top = 5, layer_name=None):
+    for strategy_name, strategy in layer_strategies.items():
+        for pattern in strategy['patterns']:
+            if pattern in layer_name:
+                return strategy['top_channels']
+
+    if layer_name != "_":
+        print(f"Layer {layer_name} using max top channels")
+    return max(strategy['top_channels'] for strategy in layer_strategies.values())
+
+def rank_gradient_info(s_latents, top = "adaptive", layer_name=None):
     """
     Find and rank the indices of the gradients based on their absolute values.
 
@@ -146,7 +176,8 @@ def rank_gradient_info(s_latents, top = 5, layer_name=None):
                           Format: {'layer_name': {'grad': torch.Tensor}, ...},
                           where the tensors are the affine outputs with gradient values.
         top (int, optional): Number of top gradients to return for each layer.
-                                If None, return all gradients.
+                                If "adaptive", adaptive_top_channels.
+                                If "all" or None, returns all gradients.
         layer_name (str or list, optional): Name of the layer(s) to rank gradients.
                                             If None or "all", includes all layers.
                                             If a string, uses that single layer.
@@ -165,6 +196,8 @@ def rank_gradient_info(s_latents, top = 5, layer_name=None):
         ranked_indices = torch.argsort(grad_abs, descending=True).squeeze().tolist()
         gradient_raw = grad.view(-1)[ranked_indices].tolist()
 
+        if top == "adaptive":
+            top = get_adaptive_top_channels(ln)
         # Truncate to the top gradients if specified
         if top is not None:
             ranked_indices = ranked_indices[:top]
@@ -175,9 +208,9 @@ def rank_gradient_info(s_latents, top = 5, layer_name=None):
     if layer_name is None or layer_name == 'all':
         # Handle the case for all layers
         gradient_info_by_layer = {}
-        for layer_name, layer_data in s_latents.items():
+        for ln, layer_data in s_latents.items():
             ranked_indices, gradient_raw = process_gradients(layer_data, top)
-            gradient_info_by_layer[layer_name] = {
+            gradient_info_by_layer[ln] = {
                 'ranked_indices': ranked_indices,
                 'gradients': gradient_raw
             }
