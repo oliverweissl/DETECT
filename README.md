@@ -16,7 +16,7 @@ All tasks are executed via a unified entry point in `main.py`, which supports di
 * Python 3.8+
 * PyTorch (CUDA supported)
 * [Ultralytics YOLOv8](https://docs.ultralytics.com/)
-* Other dependencies listed in `requirements.txt`
+* Other dependencies listed in `environment.yml`
 
 Make sure to download and place the pretrained models (GANs, classifiers, and segmentation models) at the paths defined in `configs.py`.
 
