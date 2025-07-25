@@ -1,11 +1,9 @@
 
 # Testing Vision Models
 
-This repository provides a unified pipeline for generating test cases in vision models using disentangled latent space manipulations based on pretrained StyleGAN generators. It supports three tasks:
+This repository provides a unified pipeline for generating test cases in vision models using disentangled latent space manipulations based on pretrained StyleGAN generators.
 
-* **Facial attribute classification** (CelebA)
-* **Dog breed classification** (LSUN Dog)
-* **Car detection** (LSUN Car with YOLOv8)
+
 
 All tasks are executed via a unified entry point in `main.py`, which supports different configurations of perturbation and oracle strategies.
 
