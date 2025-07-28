@@ -79,7 +79,15 @@ Each folder contains:
 * Prediction logs
 * Perturbation metadata
 
----
+## 📦 Checkpoints and Training Code
+
+Due to space limitations, we only include the **inference pipeline** in this repository. The code used to **train or fine-tune** the following models is available in a separate archive:
+
+* StyleGAN2 generators (with limited fine-tuning via ADA)
+* Classifiers (ResNet50, SWAG-ViT, ReXNet, YOLOv8)
+* Segmentation models
+
+We provide **trained or fine-tuned checkpoints upon request**. Please contact the authors or repository maintainers if you would like access to specific models.
 
 ## 🔍 Notes
 
